@@ -7,3 +7,5 @@ local.properties
 out/
 *.iml
 **/.kotlin/
+**/bin/
+**/obj/

@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
             VirCamTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(Modifier.fillMaxSize().padding(innerPadding).padding(20.dp)) {
-                        Text("VirCam · P0 虚拟相机探针")
+                        Text("VirCam · 虚拟相机探针")
                         Spacer(Modifier.height(12.dp))
                         Text("最低 Android 16 / API 36")
                         Text("displayId=${display?.displayId} · deviceId=$deviceId")
@@ -109,10 +109,12 @@ class MainActivity : ComponentActivity() {
         message = "正在连接虚拟相机，等待变化标记"
         val next = CameraReader(this, display?.displayId ?: 0,
             intent.getIntExtra("virtualDeviceId", 0), intent.getStringExtra("cameraId") ?: "",
-            intent.getStringExtra("session") ?: "",
+            intent.getStringExtra("session") ?: "",intent.getStringExtra("inputMode")=="desktop",
             onFrame = { frame ->
                 preview = frame.preview
-                message = "已读到 ${frame.accepted} 个变化帧 · 标记 ${frame.marker}\n时间戳 ${frame.timestamp} ns"
+                message = if(intent.getStringExtra("inputMode")=="desktop")
+                    "电脑输入 · 已读取 ${frame.accepted} 帧 · ${if(frame.qrSha256!=null) "已识别二维码（不显示正文）" else "未检测到二维码"}"
+                    else "已读到 ${frame.accepted} 个变化帧 · 标记 ${frame.marker}\n时间戳 ${frame.timestamp} ns"
             }, onError = { error -> reader = null; preview = null; message = error })
         reader = next
         try { next.start() } catch (e: Exception) {

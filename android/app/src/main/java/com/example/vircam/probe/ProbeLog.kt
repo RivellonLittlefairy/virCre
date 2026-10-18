@@ -10,6 +10,7 @@ object ProbeLog {
     @Synchronized fun write(context: Context, session: String, value: JSONObject) {
         val safeSession = if (session.matches(Regex("[a-f0-9]{32}"))) session else "permission-setup"
         value.put("session", safeSession)
+        value.put("elapsedMs",android.os.SystemClock.elapsedRealtime())
         val line = value.toString()
         Log.i("VirCreProbe", line)
         File(context.filesDir, "p0-$safeSession.jsonl").appendText("$line\n", Charsets.UTF_8)

@@ -5,9 +5,13 @@ param(
     [string]$Adb = 'adb',
     [string]$Scrcpy = 'scrcpy',
     [switch]$NoMirror,
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [ValidateSet('pattern','desktop')][string]$InputMode = 'pattern',
+    [string]$StateFile,
+    [string]$StopFile
 )
 $ErrorActionPreference = 'Stop'
+$script:CleaningUp=$false
 . (Join-Path $PSScriptRoot 'Device.ps1')
 . (Join-Path $PSScriptRoot 'Evidence.ps1')
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -17,6 +21,7 @@ $identity = Assert-P0Device
 $session = [Guid]::NewGuid().ToString('N')
 $sessionDir = Join-Path $repoRoot "out\$session"
 New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
+if($StateFile) { [ordered]@{evidenceDirectory=$sessionDir;session=$session}|ConvertTo-Json|Set-Content -LiteralPath "$StateFile.launch.json" -Encoding utf8 }
 $identity | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $sessionDir 'device.json') -Encoding utf8
 $sessionBytes = [Guid]::NewGuid().ToByteArray()
 $mac = '02:56:43:{0:x2}:{1:x2}:{2:x2}' -f $sessionBytes[0], $sessionBytes[1], $sessionBytes[2]
@@ -34,6 +39,8 @@ $cleanupErrors = [System.Collections.Generic.List[string]]::new()
 $ready = $null
 $probeStopAt = $null
 $probeStopped = $false
+$forwardPort = $null
+$forwardAttempted = $false
 $userId = Invoke-DeviceAdb -AdbArgs @('shell','am','get-current-user')
 if ($userId -ne '0') { throw 'P0 currently supports the primary Android user (0) only' }
 try {
@@ -74,13 +81,15 @@ try {
     (Invoke-DeviceAdb -AdbArgs @('shell','cmd','companiondevice','list',$userId)) -split "`n" |
         Where-Object { $_ -match 'com\.android\.shell' -and $_ -match [regex]::Escape($mac) } |
         Set-Content -LiteralPath (Join-Path $sessionDir 'associations-after-create.txt') -Encoding utf8
-    Invoke-DeviceAdb -AdbArgs @('push',$apk,$remoteApk) | Out-Null
     $pushed = $true
+    Invoke-DeviceAdb -AdbArgs @('push',$apk,$remoteApk) | Out-Null
     $agentCommand = "CLASSPATH=$remoteApk app_process /system/bin com.example.vircam.shell.ShellMain $associationId $Seconds $session $seed"
+    if($InputMode -eq 'desktop') { $agentCommand += ' desktop' }
     $agent = Start-Process -FilePath $Adb -ArgumentList @('-s',$Serial,'shell',$agentCommand) -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $agentOut -RedirectStandardError $agentErr
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds + 20)
     while (-not $agent.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        if($StopFile -and (Test-Path -LiteralPath $StopFile)) { throw [OperationCanceledException]::new('User stopped desktop session') }
         if ($probeStopAt -and -not $probeStopped -and [DateTime]::UtcNow -ge $probeStopAt) {
             # Stop the consumer before the planned camera teardown, rather than reporting
             # the expected teardown as an unexpected camera disconnection.
@@ -98,6 +107,12 @@ try {
                 $ready = $events | Where-Object event -eq 'ready' | Select-Object -First 1
                 if ($ready) {
                     $probeStopAt = [DateTime]::UtcNow.AddSeconds($Seconds - 2)
+                    if($InputMode -eq 'desktop') {
+                        if($ready.inputSocket -ne "vircre-$session") { throw 'Unexpected input socket identity' }
+                        $forwardAttempted = $true
+                        $forwardPort = [int](Invoke-DeviceAdb -AdbArgs @('forward','tcp:0',"localabstract:$($ready.inputSocket)"))
+                        if($forwardPort -lt 1 -or $forwardPort -gt 65535) { throw 'Invalid ADB forward port' }
+                    }
                     if (-not $NoMirror) {
                         $mirrorCommand = Get-Command $Scrcpy -ErrorAction SilentlyContinue
                         if ($mirrorCommand) {
@@ -112,7 +127,12 @@ try {
                     Write-Host (Invoke-DeviceAdb -AdbArgs @('shell','am','start','-W','--display',"$($ready.displayId)",
                         '-n','com.example.vircam/.MainActivity','-f','0x18000000',
                         '--ei','virtualDeviceId',"$($ready.deviceId)",'--es','cameraId',"$($ready.cameraId)",
-                        '--es','session',$session))
+                        '--es','session',$session,'--es','inputMode',$InputMode))
+                    if($StateFile -and $InputMode -eq 'desktop') {
+                        [ordered]@{session=$session;serial=$Serial;port=$forwardPort;deviceId=$ready.deviceId;
+                            displayId=$ready.displayId;mirrorPid=$(if($mirror){$mirror.Id}else{0});evidenceDirectory=$sessionDir} |
+                            ConvertTo-Json | Set-Content -LiteralPath $StateFile -Encoding utf8
+                    }
                 }
             }
         }
@@ -127,32 +147,46 @@ try {
     if (-not $ready) { throw 'Agent ended without a ready event' }
     $probeLog = Invoke-DeviceAdb -AdbArgs @('shell','run-as','com.example.vircam','cat',"files/p0-$session.jsonl")
     $probeLog | Set-Content -LiteralPath (Join-Path $sessionDir 'probe.log') -Encoding utf8
-    $evidence = Measure-P0Evidence -ProbeLines ($probeLog -split "`n") -AgentLines (Get-Content -LiteralPath $agentOut) `
-        -Session $session -DeviceId $ready.deviceId -DisplayId $ready.displayId -CameraId $ready.cameraId
-    if ($evidence.Failures -gt 0 -or $evidence.Count -lt 3) { throw "No continuous matching camera evidence ($($evidence.Count) frames, $($evidence.Failures) failures)" }
-    $status = 'input-path-verified'
-    Write-Host "Input path verified: $($evidence.Count) matched Camera2 frames. Stability/physical-lens-cover checks remain separate."
+    if($InputMode -eq 'pattern') {
+        $evidence = Measure-P0Evidence -ProbeLines ($probeLog -split "`n") -AgentLines (Get-Content -LiteralPath $agentOut) `
+            -Session $session -DeviceId $ready.deviceId -DisplayId $ready.displayId -CameraId $ready.cameraId
+        if ($evidence.Failures -gt 0 -or $evidence.Count -lt 3) { throw "No continuous matching camera evidence ($($evidence.Count) frames, $($evidence.Failures) failures)" }
+        $status = 'input-path-verified'
+        Write-Host "Input path verified: $($evidence.Count) matched Camera2 frames. Stability/physical-lens-cover checks remain separate."
+    } else { $status='desktop-session-ended' }
+} catch [OperationCanceledException] {
+    $status='stopped'
+    Write-Host $_.Exception.Message
 } finally {
+    $script:CleaningUp=$true
     if ($ready -and -not $probeStopped) {
         try { Invoke-DeviceAdb -AdbArgs @('shell','am','force-stop','com.example.vircam') -TimeoutSeconds 5 | Out-Null }
         catch { $cleanupErrors.Add($_.Exception.Message) }
     }
     if ($remotePid) {
         try {
-            $commandLine = Invoke-DeviceAdb -AdbArgs @('shell','cat',"/proc/$remotePid/cmdline")
+            $commandLine = Invoke-DeviceAdb -AdbArgs @('shell','cat',"/proc/$remotePid/cmdline") -TimeoutSeconds 5
             if ($commandLine.Contains($session) -and $commandLine.Contains('com.example.vircam.shell.ShellMain')) {
-                Invoke-DeviceAdb -AdbArgs @('shell','kill','-TERM',"$remotePid") | Out-Null
+                Invoke-DeviceAdb -AdbArgs @('shell','kill','-TERM',"$remotePid") -TimeoutSeconds 5 | Out-Null
             }
         } catch { if ($agent -and -not $agent.HasExited) { $cleanupErrors.Add($_.Exception.Message) } }
     }
     if ($agent -and -not $agent.HasExited) { Stop-Process -Id $agent.Id -ErrorAction SilentlyContinue }
     if ($mirror -and -not $mirror.HasExited) { Stop-Process -Id $mirror.Id -ErrorAction SilentlyContinue }
+    if($ready -and $InputMode -eq 'desktop') {
+        try { Invoke-DeviceAdb -AdbArgs @('shell','run-as','com.example.vircam','cat',"files/p0-$session.jsonl") -TimeoutSeconds 5 |
+            Set-Content -LiteralPath (Join-Path $sessionDir 'probe.log') -Encoding utf8 } catch { Write-Warning 'Probe metadata unavailable' }
+    }
+    if($forwardAttempted) {
+        try { Remove-SessionForward -Serial $Serial -Session $session }
+        catch { $cleanupErrors.Add($_.Exception.Message) }
+    }
     if ($associationCreated) {
-        try { Invoke-DeviceAdb -AdbArgs @('shell','cmd','companiondevice','disassociate',$userId,'com.android.shell',$mac) | Out-Null }
+        try { Invoke-DeviceAdb -AdbArgs @('shell','cmd','companiondevice','disassociate',$userId,'com.android.shell',$mac) -TimeoutSeconds 5 | Out-Null }
         catch { $cleanupErrors.Add($_.Exception.Message) }
     }
     if ($pushed) {
-        try { Invoke-DeviceAdb -AdbArgs @('shell','rm',$remoteApk) | Out-Null }
+        try { Invoke-DeviceAdb -AdbArgs @('shell','rm',$remoteApk) -TimeoutSeconds 5 | Out-Null }
         catch { $cleanupErrors.Add($_.Exception.Message) }
     }
     if ($cleanupErrors.Count -gt 0) { $status = 'cleanup-failed' }

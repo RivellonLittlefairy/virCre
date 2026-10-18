@@ -10,8 +10,8 @@ import java.util.concurrent.TimeUnit;
 public final class ShellMain {
     private ShellMain() {}
     public static void main(String[] args) {
-        if (android.os.Process.myUid() != 2000 || args.length != 4) {
-            System.err.println("Usage (ADB shell only): ShellMain associationId seconds session seed");
+        if (android.os.Process.myUid() != 2000 || (args.length != 4 && args.length != 5)) {
+            System.err.println("Usage (ADB shell only): ShellMain associationId seconds session seed [desktop]");
             System.exit(2);
             return;
         }
@@ -32,7 +32,8 @@ public final class ShellMain {
         int exitCode = 0;
         try {
             AgentLog.event("started", "pid", android.os.Process.myPid(), "session", args[2]);
-            adapter.create(associationId, seed, args[2]);
+            if(args.length==5 && !args[4].equals("desktop")) throw new IllegalArgumentException("Unknown input mode");
+            adapter.create(associationId, seed, args[2],args.length==5);
             long end = SystemClock.elapsedRealtime() + seconds * 1000L;
             while (SystemClock.elapsedRealtime() < end) {
                 if (adapter.renderFailure() != null) throw new IllegalStateException("Rendering failed", adapter.renderFailure());

@@ -19,8 +19,11 @@ import com.example.vircam.core.FrameEvidence
 import com.example.vircam.core.FrameMarker
 import com.example.vircam.core.ProbeGuard
 import org.json.JSONObject
+import com.google.zxing.*
+import com.google.zxing.common.HybridBinarizer
+import java.security.MessageDigest
 
-data class ProbeFrame(val marker: Int, val accepted: Int, val timestamp: Long, val preview: Bitmap?)
+data class ProbeFrame(val marker: Int, val accepted: Int, val timestamp: Long, val preview: Bitmap?,val qrSha256:String?=null)
 
 /** Owns one foreground camera session. Does not select or fall back to another camera. */
 class CameraReader(
@@ -29,6 +32,7 @@ class CameraReader(
     private val expectedDevice: Int,
     private val cameraId: String,
     private val sessionId: String,
+    private val desktopMode:Boolean,
     private val onFrame: (ProbeFrame) -> Unit,
     private val onError: (String) -> Unit
 ) : AutoCloseable {
@@ -41,6 +45,8 @@ class CameraReader(
     @Volatile private var closed = false
     private val evidence = FrameEvidence()
     private var lastTimestamp = -1L
+    private var desktopFrames=0
+    private val qrReader=MultiFormatReader().apply { setHints(mapOf(DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE))) }
     @Volatile private var lastFresh = SystemClock.elapsedRealtime()
     private val staleCheck = object : Runnable {
         override fun run() {
@@ -73,21 +79,33 @@ class CameraReader(
                 if (closed) return@use
                 val plane = image.planes[0]
                 val marker = FrameMarker.sample(plane.buffer, image.width, image.height, plane.rowStride, plane.pixelStride)
-                val fresh = image.timestamp > lastTimestamp && evidence.accept(marker)
+                val fresh = image.timestamp > lastTimestamp && (desktopMode || evidence.accept(marker))
                 if (!fresh) return@use
                 lastTimestamp = image.timestamp
                 lastFresh = SystemClock.elapsedRealtime()
                 val values = IntArray(image.width * image.height)
+                val packed=if(desktopMode) ByteArray(values.size) else null
                 val bytes = plane.buffer
                 val base = bytes.position()
                 for (y in 0 until image.height) for (x in 0 until image.width) {
                     val luma = bytes.get(base + y * plane.rowStride + x * plane.pixelStride).toInt() and 255
                     values[y * image.width + x] = (0xff shl 24) or (luma shl 16) or (luma shl 8) or luma
+                    packed?.set(y*image.width+x,luma.toByte())
+                }
+                var qrHash:String?=null
+                if(packed!=null) {
+                    desktopFrames++
+                    try {
+                        val decoded=qrReader.decodeWithState(BinaryBitmap(HybridBinarizer(PlanarYUVLuminanceSource(packed,image.width,image.height,0,0,image.width,image.height,false))))
+                        qrHash=MessageDigest.getInstance("SHA-256").digest(decoded.text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
+                    } catch (_:ReaderException) { } finally { qrReader.reset() }
                 }
                 val preview = Bitmap.createBitmap(values, image.width, image.height, Bitmap.Config.ARGB_8888)
-                val frame = ProbeFrame(marker, evidence.accepted(), image.timestamp, preview)
+                val count=if(desktopMode) desktopFrames else evidence.accepted()
+                val frame = ProbeFrame(marker,count,image.timestamp,preview,qrHash)
                 ProbeLog.write(context, sessionId, JSONObject().put("event", "frame-read")
-                    .put("marker", marker).put("accepted", evidence.accepted()).put("timestamp", image.timestamp)
+                    .put("marker", marker).put("accepted",count).put("timestamp", image.timestamp)
+                    .put("source",if(desktopMode) "desktop" else "pattern").put("qrSha256",qrHash ?: JSONObject.NULL)
                     .put("deviceId", context.deviceId).put("displayId", displayId).put("cameraId", cameraId))
                 main.post { if (!closed) onFrame(frame) }
             }

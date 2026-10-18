@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VirCam · Windows 画面输入使用与实测</title><style>body{max-width:1020px;margin:36px auto;padding:0 24px 60px;font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;color:#20382e}h1,h2,a{color:#17684d}table{border-collapse:collapse;width:100%}td,th{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #dbe5df}pre{background:#f0f5f2;padding:16px;white-space:pre-wrap;overflow-wrap:anywhere}code{overflow-wrap:anywhere}.note{background:#fff4dd;padding:16px;border-left:4px solid #b58020}</style></head><body><main>
+<h1>Windows 画面输入</h1><p>2026-10-18 · <a href="index.html">工程首页</a> · <a href="pc-input-design.html">设计与协议</a> · <a href="verification.html">P0 记录</a></p>
+<p class="note">已实现 Windows 控制程序：选择图片或框选固定桌面区域，经 ADB 送入 Android 16 虚拟相机。两张文件二维码及一个真实桌面区域的 Camera2 读回已验证。首版复用官方 scrcpy 5.0.1，没有修改或 fork scrcpy。</p>
+<h2>启动和使用</h2><p>依赖 Windows、.NET 8 SDK、PowerShell 7、PATH 中的 adb 与 scrcpy，以及已授权连接的 Android 16 手机。首次运行或修改 Android 代码后先构建 APK：</p><pre>cd C:\Users\msf\AndroidStudioProjects\virCre
+pwsh -File .\tools\Build.ps1
+pwsh -File .\tools\Start-Desktop.ps1</pre>
+<ol><li>在 Windows 控制窗口刷新设备，确认目标手机序列号。多设备时必须明确选择。</li><li>首次安装或 Android App 更新后勾选“更新测试 APK”。本次已安装的版本可取消勾选，然后点“启动手机会话”。手机如有安装确认，需手动允许。</li><li>在置顶的“VirCam-P0”投屏窗口允许摄像头。每次新建虚拟设备可能单独询问。保持手机解锁和测试 App 前台；探针离开前台会停止读取，可回到探针点击“开始读取”。</li><li>点击“选择图片”，或“框选桌面区域”并拖选区域。将控制窗口和投屏窗口移出采集区，再点击“开始输入”。</li><li>电脑预览显示本次已发送并获接收端确认的内容；投屏预览显示 Camera2 实际读回的灰度图。ACK 表示接收成功，不能单独证明 Camera2 读回成功。</li><li>“暂停输入”停止供图并清空电脑预览。手机显示“PC INPUT PAUSED”，表示没有有效的新 PC 输入；连接后尚未点击开始、主动暂停、断连或输入过期都会出现该图。</li><li>“停止会话”、关闭本次 scrcpy 或关闭控制程序进入清理。日志按钮可打开证据目录。若提示清理失败，应查看 result.json 和 session.json；不要把失败当成正常停止。</li></ol>
+<p>调试程序单次会话最长 600 秒，到时需手动重新启动。连接断开后不自动重连或恢复输入。测试 App 预览使用 Y 平面，因此显示灰度；桌面传输本身为 PNG 彩色图。</p>
+<h2>当前边界</h2><p>固定区域读取 Windows 当前可见像素。其他窗口、游戏、悬浮图层覆盖时，也会进入采集图。程序能拒绝与自身控制窗口及本次 scrcpy 窗口相交的区域，不能识别所有外部遮挡。移动窗口不改变已选区域坐标；显示器布局变化后应重新框选。</p><p>尚未实现“让投屏框自动跟随，并取它背后的桌面内容”。该能力需要另行设计 Windows 捕获与排除窗口机制。当前也未验证第三方扫码 App、全局物理相机替换、十分钟连续稳定运行或五次完整会话启停；下文五轮指同一会话内的输入切换。</p>
+<h2>实测证据</h2><table><tr><th>项目</th><th>结果与边界</th></tr>
+<tr><td>PC 图片输入</td><td>会话 519e13917f664302a5ad9b6dfa5dd56f：5 轮 A/B，各发送 10 帧，共 100 帧。Camera2 总读帧 675；二维码 A 摘要匹配 25 帧、B 匹配 24 帧，探针错误 0。</td></tr>
+<tr><td>暂停后旧图</td><td>上述会话 10 个暂停窗口；从接收端 input-paused 后 1500 ms 起，到下一帧输入前，526 个 Camera2 样本均无二维码。一次暂停后约 1005 ms 仍有旧二维码读回，约 1576 ms 时已消失；未宣称瞬时清空消费者缓冲或精确延迟上限。最后一个窗口包含长时间空闲样本，数量不能当作独立启停次数。</td></tr>
+<tr><td>固定桌面区域</td><td>会话 63d060c1f1b34a93bda90311aa9b44b2，deviceId=13 / displayId=33 / App 相机 ID=0。真实区域 X=1614、Y=265、640×480，225% DPI；2394 个采样点与受控 QR 源完全一致，发送 10 个桌面捕获帧；Camera2 4 帧读到预期 A 摘要，暂停后 23 个超过 1500 ms 的样本无二维码。探针错误 0。</td></tr>
+<tr><td>遮挡对照</td><td>测试主动拒绝自身窗口覆盖。屏幕右上方曾出现 58/2394 彩色像素差异；移动测试源后为 0。第二张桌面 QR 尝试因 1019/2394 像素不符而拒绝，未计为成功，也未保存桌面截图。</td></tr>
+<tr><td>退出清理</td><td>两个成功会话均 status=stopped、cleanupErrors=[]。只读检查：ADB forward 列表为空，VDM 没有活动虚拟设备，CDM 仅保留原有两条 com.mi.health 关联。实验会话均已停止。</td></tr>
+</table>
+<p>A 的 SHA-256：<code>3471e284df1516637f370754ac8125c5e55df1708b8fa842f6490392b8653b92</code>。B：<code>dec2ea97035914868255b7e7c97ed7abb4cee4d3923be1106a3db7c6a689e0c4</code>。受控 fixture 为项目生成的非敏感二维码；运行日志仅记录摘要与帧元数据，不记录二维码正文或像素。</p>
+<p>本地证据在 <code>out/519e13917f664302a5ad9b6dfa5dd56f/</code> 和 <code>out/63d060c1f1b34a93bda90311aa9b44b2/</code> 的 agent.jsonl、probe.log、result.json、pc-metrics.json。out 默认不提交 Git。旧 connection.json 仅属于已结束的会话，不能重新连接使用。</p>
+<h2>实现与检查</h2><p>输入保持比例并留边至 640×480；PNG 上限 1 MiB。64 字节大端协议校验版本、会话、deviceId、序号和尺寸；只连接 127.0.0.1 的指定 ADB 转发。单个在途帧等待 ACK，交换超时 3 秒；Android 只保存最新图，暂停、断连或接收端超过 1500 ms 无新图时清空。消费者端另有相机及 UI 缓冲，因此这些设置不能视为端到端延迟保证。</p>
+<pre>dotnet build .\desktop\VirCam.Desktop --nologo
+dotnet run --project .\desktop\VirCam.Tests
+pwsh -File .\tools\Test-Tools.ps1
+.\android\gradlew.bat -p android :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+# 此测试会短暂显示受控窗口，请保持桌面可见：
+dotnet run --project .\desktop\VirCam.CaptureTests -- --pixels-only .\android\app\build\fixtures\qr-A.png</pre>
+<p>Windows 构建 0 错误、0 警告；协议、输入切换代际、清理结果传播检查通过。Android 构建、10 个单元测试及 lintDebug 任务通过；lint 仍有隐藏 API 及依赖等警告，不视为零警告。PowerShell 检查覆盖证据过滤、进程超时、启动前与运行中取消、动态转发结果丢失后的精确回收及其他会话保护。</p><p>独立代码审查及复审已完成：修复旧输入发布、授权等待不可取消、清理失败被隐藏，以及创建转发结果丢失后的资源遗留。复审无新增 Important/Critical。shell 进程的文字占位图使用像素字模，避免 Canvas/Typeface 初始化造成原生断言崩溃。</p>
+<h2>源码入口</h2><p><code>desktop/VirCam.Desktop/</code> 为 Windows UI、图片与桌面采集；<code>desktop/VirCam.Core/</code> 为协议、背压和会话结果校验；<code>tools/Start-Desktop.ps1</code> 为桌面入口；<code>tools/Start-P0.ps1</code> 负责设备会话与精确清理；Android 的 <code>shell/DesktopReceiver.java</code>、<code>shell/EglPattern.java</code> 接收并供图，<code>probe/CameraReader.kt</code> 提供实际读回证据。</p>
+</main></body></html>

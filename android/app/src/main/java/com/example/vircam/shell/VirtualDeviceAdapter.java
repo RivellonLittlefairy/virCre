@@ -37,8 +37,9 @@ final class VirtualDeviceAdapter implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
     private int counter;
     private volatile Throwable renderFailure;
+    private DesktopReceiver desktop;
 
-    void create(int associationId, int seed, String session) throws Exception {
+    void create(int associationId, int seed, String session,boolean desktopMode) throws Exception {
         counter = seed;
         AgentLog.event("stage", "name", "shell-context");
         Class<?> activityThread = Class.forName("android.app.ActivityThread");
@@ -82,6 +83,7 @@ final class VirtualDeviceAdapter implements AutoCloseable {
                 "uid", android.os.Process.myUid(), "package", context.getPackageName());
         device = invoke(manager, "createVirtualDevice", new Class<?>[]{int.class, paramsType}, associationId, params);
         AgentLog.event("device-created", "deviceId", deviceId());
+        if(desktopMode) desktop=new DesktopReceiver(session,deviceId());
 
         AgentLog.event("stage", "name", "create-display");
         drainThread = new HandlerThread("vircre-display-drain");
@@ -130,7 +132,8 @@ final class VirtualDeviceAdapter implements AutoCloseable {
         camera = invoke(device, "createVirtualCamera", new Class<?>[]{config.getClass()}, config);
         AgentLog.event("ready", "session", session, "deviceId", deviceId(), "displayId", displayId(),
                 // Android 16 CameraService maps the virtual back camera to "0" for device contexts.
-                "cameraId", "0", "registeredCameraId", cameraId(), "seed", seed);
+                "cameraId", "0", "registeredCameraId", cameraId(), "seed", seed,
+                "inputMode",desktopMode ? "desktop" : "pattern", "inputSocket",desktopMode ? desktop.socketName : "");
     }
 
     private void onCallback(String name, Object[] args) {
@@ -147,9 +150,13 @@ final class VirtualDeviceAdapter implements AutoCloseable {
             Long last = lastFrames.get(streamId);
             if (last != null && now - last < 190) return;
             int marker = counter++ & 0xffff;
-            pattern.render(marker);
+            if(desktop==null) pattern.render(marker);
+            else {
+                com.example.vircam.core.LatestFrame.Snapshot<android.graphics.Bitmap> image=desktop.frames.snapshot(now,1500);
+                pattern.renderDesktop(image==null ? null : image.value);
+            }
             lastFrames.put(streamId, now);
-            AgentLog.event("frame-submitted", "streamId", streamId, "requestId", args[1], "marker", marker);
+            if(desktop==null) AgentLog.event("frame-submitted", "streamId", streamId, "requestId", args[1], "marker", marker);
         } else if (name.equals("onStreamClosed")) {
             EglPattern pattern = streams.remove(streamId);
             if (pattern != null) pattern.close();
@@ -177,6 +184,7 @@ final class VirtualDeviceAdapter implements AutoCloseable {
 
     @Override public synchronized void close() {
         if (!closed.compareAndSet(false, true)) return;
+        if(desktop!=null) desktop.close();
         closeHidden(camera, "camera");
         if (display != null) display.release();
         closeHidden(device, "device");
