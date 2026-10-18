@@ -89,7 +89,7 @@
                             <GridView.ItemTemplate>
                                 <DataTemplate x:DataType="presentation:AppCard">
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            BorderThickness="1" CornerRadius="10" Padding="16">
+                                            BorderThickness="1" CornerRadius="10" Padding="16" Tag="{Binding}" DoubleTapped="AppCard_DoubleTapped">
                                         <Grid RowSpacing="11">
                                             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                             <Grid>
@@ -107,13 +107,31 @@
                                                 <TextBlock Text="{x:Bind PackageName}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{x:Bind KindLabel}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
-                                            <Button Grid.Row="2" Content="打开应用" IsEnabled="False" HorizontalAlignment="Stretch" FontSize="12" MinHeight="28" Padding="10,3"
-                                                    ToolTipService.ToolTip="独立开窗将在下一阶段接入" />
+                                            <Button Grid.Row="2" Content="打开应用" HorizontalAlignment="Stretch" FontSize="12" MinHeight="28" Padding="10,3"
+                                                    Click="OpenApp_Click" Tag="{Binding}" ToolTipService.ToolTip="在独立窗口中打开此应用" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </GridView.ItemTemplate>
                         </GridView>
+                        <ListView x:Name="RunningList" Visibility="Collapsed" SelectionMode="None" Padding="0,0,0,12">
+                            <ListView.ItemContainerStyle><Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,12" />
+                            </Style></ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate><DataTemplate x:DataType="launcher:AppWindowInfo">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+                                    <Grid ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="5" ToolTipService.ToolTip="{Binding Request.Serial}">
+                                            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Text="{Binding DeviceName}" Style="{StaticResource SectionHint}" /><TextBlock Text="{Binding StateLabel}" Style="{StaticResource SectionHint}" /></StackPanel>
+                                            <TextBlock Text="{Binding PackageName}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="切回窗口" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Click="FocusWindow_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="关闭" Tag="{Binding Id}" IsEnabled="{Binding CanClose}" Click="CloseWindow_Click" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate></ListView.ItemTemplate>
+                        </ListView>
                         <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="390" Margin="20">
                             <Border Width="72" Height="72" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="20" HorizontalAlignment="Center">
                                 <FontIcon x:Name="EmptyIcon" Glyph="&#xE8A9;" FontSize="30" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -135,7 +153,7 @@
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
                                     <StackPanel Spacing="8">
                                         <TextBlock Text="关于这个版本" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="应用名称和包名由程序实时从所选手机读取。当前支持设备选择、刷新、搜索与临时收藏；独立开窗将在下一阶段加入。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="应用名称和包名实时从所选手机读取。双击应用卡片可打开独立窗口；在运行中页面切回或关闭。窗口不转发声音。" Style="{StaticResource SectionHint}" />
                                         <TextBlock Text="应用图标暂用统一占位图形。" Style="{StaticResource SectionHint}" />
                                         <TextBlock Text="主题与收藏只在本次运行中生效。" Style="{StaticResource SectionHint}" />
                                     </StackPanel>
@@ -144,10 +162,13 @@
                         </ScrollViewer>
                     </Grid>
                     <Border Grid.Row="3" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                        <StackPanel Spacing="8">
+                        <InfoBar x:Name="ActionNotice" IsOpen="False" IsClosable="True" />
                         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
                             <TextBlock x:Name="FooterStatus" Grid.Column="1" Text="连接手机后读取应用。" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                         </Grid>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

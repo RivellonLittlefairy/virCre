@@ -87,7 +87,13 @@ await stopping;
 await inflight;
 Require(shutdownModel.Apps.Count == 0, "A late response was published after shutdown");
 Console.WriteLine("PASS: shutdown waits for in-flight cleanup and rejects late data");
-static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
+var windowsModel=new ShellViewModel();
+windowsModel.UpdateWindows([new VirCre.Launcher.AppWindowInfo(Guid.NewGuid(),new("p","Phone","com.app","应用"),VirCre.Launcher.AppWindowState.Running,7)]);
+windowsModel.Navigate("running");
+Require(!windowsModel.IsEmpty && windowsModel.Running.Count==1,"Running windows must be shown even without the original device selected");
+windowsModel.UpdateWindows([]);
+Require(windowsModel.IsEmpty,"Closing last window must restore running empty state");
+Console.WriteLine("PASS: running windows remain independent of selected device and update empty state");static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();

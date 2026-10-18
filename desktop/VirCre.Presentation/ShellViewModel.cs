@@ -9,13 +9,16 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     private readonly List<AppCard> catalog;
     private readonly HashSet<string> favorites = new(StringComparer.Ordinal);
     private readonly ObservableCollection<AppCard> visible = [];
+    private readonly ObservableCollection<AppWindowInfo> running = [];
     public ShellViewModel(bool preview = false) {
         IsPreview = preview;
         catalog = preview ? [.. DemoCatalog.Create()] : [];
-        Apps = new(visible);Refresh();
+        Apps = new(visible);Running = new(running);Refresh();
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
+    public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
+    public string CurrentSerial {get;private set;} = "";
     public bool IsPreview {get;private set;}
     public bool HasDevice {get;private set;}
     public bool IsLoading {get;private set;}
@@ -23,7 +26,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string ErrorMessage {get;private set;} = "";
     public string Query {get;private set;} = "";
     public string Page {get;private set;} = "apps";
-    public bool IsEmpty => visible.Count == 0;
+    public bool IsEmpty => Page=="running" ? running.Count==0 : visible.Count==0;
     public string ResultCount => $"{visible.Count} 个{(IsPreview ? "示例" : "")}应用";
     public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
     public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
@@ -39,7 +42,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string EmptyTitle => Page == "running" ? "还没有打开的应用" : IsLoading ? "正在读取手机应用" :
         ErrorMessage.Length > 0 ? "暂时无法读取应用" : !HasDevice && !IsPreview ? "连接你的手机" :
         Query.Trim().Length > 0 ? "没有找到匹配的应用" : Page == "favorites" ? "把常用应用放在这里" : "没有可启动的应用";
-    public string EmptyDescription => Page == "running" ? "独立开窗将在下一阶段接入，当前尚未打开任何手机应用。" :
+    public string EmptyDescription => Page == "running" ? "双击应用卡片或点击打开，即可在这里管理独立窗口。" :
         IsLoading ? "首次读取可能需要一些时间，请保持手机连接。" : ErrorMessage.Length > 0 ? ErrorMessage :
         !HasDevice && !IsPreview ? "在左侧选择已授权的手机，或点击刷新设备。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
         Page == "favorites" ? "点击应用卡片右上角的星标，即可在本次运行中收藏。" : "点击刷新，重新读取手机上的应用。";
@@ -57,6 +60,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     internal void BeginLoad(PhoneDevice? device) {
         IsPreview=false;catalog.Clear();Query="";
         DeviceLabel=device?.Model??"未选择设备";
+        CurrentSerial=device?.Serial??"";
         HasDevice=device?.State==DeviceState.Online;
         IsLoading=HasDevice;
         ErrorMessage=device?.State switch {
@@ -67,11 +71,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     }
     internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) {
         catalog.Clear();
-        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem));
+        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial));
         IsLoading=false;ErrorMessage="";Refresh();
     }
     internal void FailLoad(string error) {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();}
     public void ReportDeviceError(string error) {BeginLoad(null);FailLoad(error);}
+    public void UpdateWindows(IReadOnlyList<AppWindowInfo> windows) {
+        running.Clear();foreach(var window in windows)running.Add(window);
+        NotifyState();
+    }
     private static string AppColor(string packageName) {
         string[] colors=["#507C93","#8576A6","#548D8A","#A86F73","#B58A4C","#697E99","#768B6F"];
         uint hash=2166136261;foreach(var ch in packageName)hash=unchecked((hash^ch)*16777619);
@@ -81,6 +89,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         var query=Query.Trim();visible.Clear();
         if(Page is "apps" or "favorites")foreach(var app in catalog.Where(app=>(Page!="favorites"||app.IsFavorite)&&
             (app.Name.Contains(query,StringComparison.OrdinalIgnoreCase)||app.PackageName.Contains(query,StringComparison.OrdinalIgnoreCase))))visible.Add(app);
+        NotifyState();
+    }
+    private void NotifyState() {
         foreach(var property in new[]{nameof(Page),nameof(Query),nameof(Title),nameof(Description),nameof(IsEmpty),nameof(ResultCount),nameof(EmptyTitle),nameof(EmptyDescription),
             nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ErrorMessage),nameof(FooterText)})
             PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(property));

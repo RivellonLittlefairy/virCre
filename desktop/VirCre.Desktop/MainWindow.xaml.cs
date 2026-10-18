@@ -22,6 +22,9 @@ public sealed partial class MainWindow : Window {
         Root.ActualThemeChanged += (_, _) => UpdateCaptionColors();
         model.PropertyChanged += (_, _) => RenderState();
         AppGrid.ItemsSource = model.Apps;
+        RunningList.ItemsSource = model.Running;
+        appWindows.Changed += AppWindows_Changed;
+        appWindows.Problem += AppWindows_Problem;
         ready = true;
         UpdateCaptionColors();
         Navigation.SelectedItem = Navigation.MenuItems[0];
@@ -30,6 +33,8 @@ public sealed partial class MainWindow : Window {
             closing = true;
             lifetime.Cancel();
             catalogController.Dispose();
+            appWindows.Changed -= AppWindows_Changed;
+            appWindows.Problem -= AppWindows_Problem;
             lifetime.Dispose();
             if (observedRoot != null) observedRoot.Changed -= XamlRoot_Changed;
         };
@@ -41,12 +46,15 @@ public sealed partial class MainWindow : Window {
         if (closing) return;
         closing = true;
         Root.IsHitTestVisible = false;
-        FooterStatus.Text = "正在停止设备读取…";
+        Navigation.IsEnabled = false;
+        FooterStatus.Text = "正在关闭应用窗口并停止设备读取…";
         lifetime.Cancel();
-        try { await Task.WhenAll(catalogController.StopAsync(), refreshTask); }
-        catch (Exception error) when (error is OperationCanceledException or IOException or TimeoutException) {
-            // Each metadata command already kills and awaits its own process before it completes.
-            System.Diagnostics.Debug.WriteLine("Metadata shutdown: " + error.GetType().Name);
+        try { await Task.WhenAll(catalogController.StopAsync(), refreshTask, appWindows.StopAsync()); }
+        catch (Exception error) {
+            // Keep ownership and allow another title-bar close attempt instead of abandoning a live process.
+            closing = false;
+            FooterStatus.Text = "关闭尚未完成：" + error.Message + " 请关闭剩余应用窗口后，再次关闭主界面。";
+            return;
         }
         allowClose = true;
         Close();
@@ -128,6 +136,8 @@ public sealed partial class MainWindow : Window {
         SettingsContent.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
         SearchRow.Visibility = settings || running ? Visibility.Collapsed : Visibility.Visible;
         AppGrid.Visibility = settings || model.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
+        if (running) AppGrid.Visibility = Visibility.Collapsed;
+        RunningList.Visibility = running && !model.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
         EmptyState.Visibility = !settings && model.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
     }
 }
