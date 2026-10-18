@@ -103,7 +103,8 @@ try {
                         if ($mirrorCommand) {
                             # Interactive window: needed for the normal Android camera permission prompt.
                             $mirror = Start-Process -FilePath $mirrorCommand.Source -ArgumentList @('-s',$Serial,
-                                "--display-id=$($ready.displayId)",'--no-audio','--window-title=VirCam-P0') -PassThru `
+                                "--display-id=$($ready.displayId)",'--no-audio','--window-title=VirCam-P0',
+                                '--always-on-top','--window-x=100','--window-y=100') -PassThru `
                                 -RedirectStandardOutput (Join-Path $sessionDir 'scrcpy.stdout.log') `
                                 -RedirectStandardError (Join-Path $sessionDir 'scrcpy.stderr.log')
                         } else { Write-Warning 'scrcpy unavailable. The virtual permission dialog requires a display viewer.' }
@@ -120,7 +121,8 @@ try {
     }
     if (-not $agent.HasExited) { throw 'P0 watchdog deadline exceeded' }
     $agent.WaitForExit()
-    Get-Content -LiteralPath $agentOut | Write-Host
+    # Full frame events stay in agent.jsonl; keep the interactive console bounded.
+    Get-Content -LiteralPath $agentOut -Tail 8 | Write-Host
     if ($agent.ExitCode -ne 0) { throw "Agent failed ($($agent.ExitCode)); see $agentErr" }
     if (-not $ready) { throw 'Agent ended without a ready event' }
     $probeLog = Invoke-DeviceAdb -AdbArgs @('shell','run-as','com.example.vircam','cat',"files/p0-$session.jsonl")
