@@ -6,3 +6,4 @@
 local.properties
 out/
 *.iml
+**/.kotlin/
