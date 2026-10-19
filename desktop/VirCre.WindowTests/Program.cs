@@ -68,11 +68,12 @@ try {
 } finally {closingHost.Processes[0].CloseRelease!.SetResult();await closeInProgress;await closingManager.StopAsync();}
 Console.WriteLine("PASS: window lifecycle checks");
 
-if(args.Length==2 && args[0]=="--device") {
-    var serial=args[1];var commands=new CommandRunner();var directory=new PhoneCatalog(commands);
+if((args.Length==2 || args.Length==4 && args[2]=="--runtime-root") && args[0]=="--device") {
+    var tools=new BundledTools(args.Length==4?args[3]:Path.GetFullPath("out/desktop-release"));
+    var serial=args[1];var commands=new CommandRunner(tools);var directory=new PhoneCatalog(commands);
     var apps=await directory.GetAppsAsync(serial,CancellationToken.None);
     var calculator=apps.FirstOrDefault(a=>a.Name=="计算器")??apps.FirstOrDefault(a=>a.PackageName.Contains("calculator",StringComparison.OrdinalIgnoreCase))??throw new Exception("No calculator app available for the live test");
-    var live=new AppWindowManager(new ScrcpyWindowHost());
+    var live=new AppWindowManager(new ScrcpyWindowHost(tools));
     try {
         var one=await live.OpenAsync(new(serial,"V2458A","com.android.settings","设置"));
         var two=await live.OpenAsync(new(serial,"V2458A",calculator.PackageName,calculator.Name));

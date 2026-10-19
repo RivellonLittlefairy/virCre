@@ -9,18 +9,19 @@ public interface ICommandRunner {
 }
 
 /// <summary>Runs metadata commands with an explicit deadline, cancellation and no console window.</summary>
-public sealed class CommandRunner : ICommandRunner {
+public sealed class CommandRunner(BundledTools? tools=null) : ICommandRunner {
     public async Task<CommandResult> RunAsync(string file, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken token) {
         token.ThrowIfCancellationRequested();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(timeout);
-        using var process = new Process { StartInfo = new ProcessStartInfo(file) {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
-        }};
+        var start=(tools??new BundledTools()).CreateStartInfo(file);
+        start.UseShellExecute=false;start.CreateNoWindow=true;
+        start.RedirectStandardOutput=true;start.RedirectStandardError=true;
+        start.StandardOutputEncoding=Encoding.UTF8;start.StandardErrorEncoding=Encoding.UTF8;
+        using var process = new Process { StartInfo = start };
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         try { process.Start(); }
-        catch (System.ComponentModel.Win32Exception) { throw new IOException($"找不到或无法启动 {file}，请检查 PATH 中的工具路径。"); }
+        catch (System.ComponentModel.Win32Exception) { throw new IOException($"无法启动 {file}，请检查完整发布目录中的手机连接组件。"); }
         var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
         var error = process.StandardError.ReadToEndAsync(deadline.Token);
         try {

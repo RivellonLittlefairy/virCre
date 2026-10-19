@@ -11,4 +11,4 @@ Get-ChildItem -LiteralPath (Join-Path $repo 'docs') | ForEach-Object {Copy-Item 
 $guide='<meta charset="utf-8"><meta http-equiv="refresh" content="0;url=docs/desktop-shortcuts.html"><a href="docs/desktop-shortcuts.html">打开使用说明</a>'
 Set-Content -LiteralPath (Join-Path $OutputDirectory '使用说明.html') -Value $guide -Encoding utf8
 Write-Output "Ready: $OutputDirectory\VirCre.Desktop.exe"
-Write-Output 'ADB and scrcpy 5.0.1+ must be available on PATH. Keep this folder in a stable location before creating shortcuts.'
+Write-Output 'ADB and scrcpy are bundled in runtime\scrcpy. Keep the complete folder in a stable location before creating shortcuts.'

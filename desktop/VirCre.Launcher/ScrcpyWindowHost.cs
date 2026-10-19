@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace VirCre.Launcher;
 
-public sealed partial class ScrcpyWindowHost : IAppWindowHost {
+public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWindowHost {
     public static int? ParseDisplayId(string line) {
         var match=Regex.Match(line,@"New display:.*?\bid=(\d+)\)",RegexOptions.IgnoreCase);
         return match.Success && int.TryParse(match.Groups[1].Value,out var id) && id>0 ? id : null;
@@ -19,13 +19,14 @@ public sealed partial class ScrcpyWindowHost : IAppWindowHost {
     }
     public IAppWindowProcess Start(AppLaunchRequest request) {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("独立窗口需要 Windows。");
-        var process=new Process {StartInfo=new ProcessStartInfo("scrcpy") {
-            UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,
-            StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8
-        }};
+        var start=(tools??new BundledTools()).CreateStartInfo("scrcpy");
+        start.UseShellExecute=false;start.CreateNoWindow=true;
+        start.RedirectStandardOutput=true;start.RedirectStandardError=true;
+        start.StandardOutputEncoding=Encoding.UTF8;start.StandardErrorEncoding=Encoding.UTF8;
+        var process=new Process {StartInfo=start};
         foreach(var argument in Arguments(request))process.StartInfo.ArgumentList.Add(argument);
         try {process.Start();return new ScrcpyProcess(process);}
-        catch(System.ComponentModel.Win32Exception) {process.Dispose();throw new IOException("无法启动 scrcpy，请检查工具路径。");}
+        catch(System.ComponentModel.Win32Exception) {process.Dispose();throw new IOException("无法启动内置 scrcpy，请检查完整发布目录中的手机连接组件。");}
     }
     [GeneratedRegex(@"^[a-zA-Z0-9._:-]+$")]private static partial Regex SerialPattern();
     [GeneratedRegex(@"^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+$")]private static partial Regex PackagePattern();

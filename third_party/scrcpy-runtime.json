@@ -1,0 +1,8 @@
+{
+  "version": "5.0.1",
+  "sourceCommit": "a60891aea193d92e7e5c3942700eca63f9d19a5f",
+  "archiveUrl": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-win64-v5.0.1.zip",
+  "archiveSha256": "b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5",
+  "archivePrefix": "scrcpy-win64-v5.0.1/",
+  "files": ["scrcpy.exe", "scrcpy-server", "adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll", "SDL3.dll", "avcodec-63.dll", "avformat-63.dll", "avutil-61.dll", "swresample-7.dll", "libusb-1.0.dll", "scrcpy.png", "disconnected.png", "LICENSE.txt"]
+}

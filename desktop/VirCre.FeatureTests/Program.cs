@@ -96,7 +96,8 @@ try {
     Check(firstPhone!=secondPhone && File.Exists(firstPhone) && File.Exists(secondPhone),"same package on different phones has isolated icon cache");
     if (args.Length is 3 or 5 && args[0] == "--device") {
         var liveCache=args.Length==5 && args[3]=="--cache-root"?Path.GetFullPath(args[4]):Path.Combine(root,"icons");
-        var live = new IconCatalog(new PhoneCatalog(new CommandRunner()), new CommandRunner(), Path.GetFullPath(args[2]), liveCache);
+        var liveTools=new BundledTools(Path.GetFullPath("out/desktop-release"));
+        var live = new IconCatalog(new PhoneCatalog(new CommandRunner(liveTools)), new CommandRunner(liveTools), Path.GetFullPath(args[2]), liveCache);
         live.Warning += message => Console.WriteLine("WARNING: " + message);
         var liveApps = await live.GetAppsAsync(args[1],default);
         Check(liveApps.Any(a => a.PackageName=="com.android.settings" && a.IconPath!=null),"live Settings icon retrieved without installation");

@@ -10,4 +10,16 @@
           Condition="'$(OS)' == 'Windows_NT' And ('$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe') And Exists('$(PublishDir)$(AssemblyName).exe')">
     <Exec Command="icacls &quot;$(PublishDir)$(AssemblyName).exe&quot; /setintegritylevel M" StandardOutputImportance="Low" />
   </Target>
+  <Target Name="NormalizeBuiltBundledToolsIntegrity" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' And '$(MSBuildProjectName)' == 'VirCre.Desktop'">
+    <ItemGroup>
+      <_BuiltBundledExecutable Include="$(TargetDir)runtime\scrcpy\scrcpy.exe;$(TargetDir)runtime\scrcpy\adb.exe" />
+    </ItemGroup>
+    <Exec Command="icacls &quot;%(_BuiltBundledExecutable.Identity)&quot; /setintegritylevel M" Condition="Exists('%(_BuiltBundledExecutable.Identity)')" StandardOutputImportance="Low" />
+  </Target>
+  <Target Name="NormalizePublishedBundledToolsIntegrity" AfterTargets="Publish" Condition="'$(OS)' == 'Windows_NT' And '$(MSBuildProjectName)' == 'VirCre.Desktop' And '$(PublishDir)' != ''">
+    <ItemGroup>
+      <_PublishedBundledExecutable Include="$(PublishDir)runtime\scrcpy\scrcpy.exe;$(PublishDir)runtime\scrcpy\adb.exe" />
+    </ItemGroup>
+    <Exec Command="icacls &quot;%(_PublishedBundledExecutable.Identity)&quot; /setintegritylevel M" Condition="Exists('%(_PublishedBundledExecutable.Identity)')" StandardOutputImportance="Low" />
+  </Target>
 </Project>

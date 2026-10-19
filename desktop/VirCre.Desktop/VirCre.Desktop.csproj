@@ -22,4 +22,11 @@
   <Target Name="BuildIconAgent" BeforeTargets="PrepareForBuild">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-IconAgent.ps1&quot;" />
   </Target>
+  <Target Name="PrepareBundledScrcpy" BeforeTargets="PrepareForBuild">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Prepare-ScrcpyRuntime.ps1&quot;" />
+    <ItemGroup>
+      <_ScrcpyRuntime Include="$(MSBuildProjectDirectory)/../../.cache/bundled-runtime/scrcpy/**/*" />
+      <Content Include="@(_ScrcpyRuntime)" Link="runtime/scrcpy/%(_ScrcpyRuntime.RecursiveDir)%(_ScrcpyRuntime.Filename)%(_ScrcpyRuntime.Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>
