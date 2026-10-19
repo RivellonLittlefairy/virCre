@@ -4,7 +4,8 @@ try {
 var request = new AppLaunchRequest("phone", "Phone", "com.android.settings", "设置");
 Check(ScrcpyWindowHost.ParseDisplayId("[server] INFO: New display: 1080x1920/420 (id=39)")==39,"display ID parsing never mistakes width for ID");
 var arguments = ScrcpyWindowHost.Arguments(request);
-Check(arguments.Contains("phone") && arguments.Contains("--start-app=com.android.settings") && arguments.Contains("--new-display=1080x1920/420") && !arguments.Any(a=>a.Contains("--start-app=+")), "exact device, package and new display without force-stop");
+Check(arguments.Contains("phone") && arguments.Contains("--start-app=com.android.settings") && arguments.Contains("--new-display=1440x2560/480") && !arguments.Any(a=>a.Contains("--start-app=+")), "exact device, package and larger new display without force-stop");
+Check(arguments.Contains("--window-width=720") && arguments.Contains("--window-height=1280"),"app windows start at a larger 720 by 1280 size");
 try {ScrcpyWindowHost.Arguments(request with {PackageName="+com.bad"});throw new Exception("Invalid package accepted");}catch(ArgumentException){}
 var host = new FakeHost();
 var manager = new AppWindowManager(host);

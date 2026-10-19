@@ -4,18 +4,23 @@ using VirCre.Launcher;
 
 namespace VirCre.Presentation;
 
-/// <summary>Owns the visible directory, selected-device state and in-memory favorites.</summary>
+/// <summary>Owns the visible directory, selected-device state and favorite/theme preferences.</summary>
 public sealed class ShellViewModel : INotifyPropertyChanged {
     private readonly List<AppCard> catalog;
     private readonly HashSet<string> favorites = new(StringComparer.Ordinal);
     private readonly ObservableCollection<AppCard> visible = [];
     private readonly ObservableCollection<AppWindowInfo> running = [];
-    public ShellViewModel(bool preview = false) {
+    public ShellViewModel(bool preview = false, UserSettings? settings = null) {
         IsPreview = preview;
         catalog = preview ? [.. DemoCatalog.Create()] : [];
+        if (settings != null) {favorites.UnionWith(settings.Favorites);Theme = settings.Theme;}
         Apps = new(visible);Running = new(running);Refresh();
     }
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event Action? SettingsChanged;
+    public string Theme {get;private set;} = "System";
+    public UserSettings ExportSettings() => new(favorites.Order(StringComparer.Ordinal).ToArray(),Theme);
+    public void SetTheme(string theme) {Theme=theme is "Light" or "Dark"?theme:"System";SettingsChanged?.Invoke();}
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
     public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
     public string CurrentSerial {get;private set;} = "";
@@ -31,7 +36,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
     public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
         IsLoading ? $"正在从 {DeviceLabel} 读取应用列表…" : ErrorMessage.Length > 0 ? ErrorMessage :
-        HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 收藏仅本次有效" : "连接手机后，读取可启动的应用列表。";
+        HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 可拖到桌面创建快捷方式" : "连接手机后，读取可启动的应用列表。";
     public string Title => Page switch {"favorites" => "收藏", "running" => "运行中", "settings" => "设置", _ => "全部应用"};
     public string Description => Page switch {
         "favorites" => "把常用的应用放在手边。",
@@ -45,7 +50,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string EmptyDescription => Page == "running" ? "双击应用卡片或点击打开，即可在这里管理独立窗口。" :
         IsLoading ? "首次读取可能需要一些时间，请保持手机连接。" : ErrorMessage.Length > 0 ? ErrorMessage :
         !HasDevice && !IsPreview ? "在左侧选择已授权的手机，或点击刷新设备。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
-        Page == "favorites" ? "点击应用卡片右上角的星标，即可在本次运行中收藏。" : "点击刷新，重新读取手机上的应用。";
+        Page == "favorites" ? "点击应用卡片右上角的星标，收藏将在重启后保留。" : "点击刷新，重新读取手机上的应用。";
 
     public void Navigate(string page) {
         if(page is not ("apps" or "favorites" or "running" or "settings"))return;
@@ -55,7 +60,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public void ToggleFavorite(string packageName) {
         var index=catalog.FindIndex(app=>app.PackageName==packageName);if(index<0)return;
         if(!favorites.Add(packageName))favorites.Remove(packageName);
-        catalog[index]=catalog[index] with {IsFavorite=favorites.Contains(packageName)};Refresh();
+        catalog[index]=catalog[index] with {IsFavorite=favorites.Contains(packageName)};Refresh();SettingsChanged?.Invoke();
     }
     internal void BeginLoad(PhoneDevice? device) {
         IsPreview=false;catalog.Clear();Query="";
@@ -71,7 +76,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     }
     internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) {
         catalog.Clear();
-        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial));
+        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial,app.IconPath));
         IsLoading=false;ErrorMessage="";Refresh();
     }
     internal void FailLoad(string error) {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();}

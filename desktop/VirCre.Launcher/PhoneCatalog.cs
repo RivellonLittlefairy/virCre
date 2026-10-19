@@ -6,7 +6,13 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
     public async Task<IReadOnlyList<PhoneDevice>> GetDevicesAsync(CancellationToken token) {
         var result = await runner.RunAsync("adb", ["devices", "-l"], TimeSpan.FromSeconds(10), token).ConfigureAwait(false);
         EnsureSuccess(result, "设备列表");
-        return ParseDevices(result.Output);
+        var devices=ParseDevices(result.Output).ToArray();
+        for(var i=0;i<devices.Length;i++) {
+            if(devices[i].State!=DeviceState.Online) continue;
+            try {devices[i]=devices[i] with {HardwareId=await ShortcutRequest.GetHardwareIdAsync(runner,devices[i].Serial,token).ConfigureAwait(false)};}
+            catch(Exception error) when(error is IOException or TimeoutException) { /* Directory discovery still works when an OEM hides its serial. */ }
+        }
+        return devices;
     }
     public async Task<IReadOnlyList<PhoneApp>> GetAppsAsync(string serial, CancellationToken token) {
         if (!SerialPattern().IsMatch(serial)) throw new ArgumentException("设备序列号格式无效。", nameof(serial));

@@ -89,12 +89,17 @@
                             <GridView.ItemTemplate>
                                 <DataTemplate x:DataType="presentation:AppCard">
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            BorderThickness="1" CornerRadius="10" Padding="16" Tag="{Binding}" DoubleTapped="AppCard_DoubleTapped">
+                                            BorderThickness="1" CornerRadius="10" Padding="16" Tag="{Binding}" DoubleTapped="AppCard_DoubleTapped"
+                                            PointerPressed="AppCard_PointerPressed" PointerMoved="AppCard_PointerMoved" PointerReleased="AppCard_PointerReleased" PointerCanceled="AppCard_PointerReleased" PointerCaptureLost="AppCard_PointerReleased">
+                                        <Border.ContextFlyout><MenuFlyout><MenuFlyoutItem Text="创建桌面快捷方式" Tag="{Binding}" Click="CreateShortcut_Click" /></MenuFlyout></Border.ContextFlyout>
                                         <Grid RowSpacing="11">
                                             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                             <Grid>
                                                 <Border Background="{Binding Color, Converter={StaticResource ColorBrush}}" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left">
-                                                    <FontIcon Glyph="{x:Bind Glyph}" FontSize="22" Foreground="White" />
+                                                    <Grid>
+                                                        <FontIcon Glyph="{x:Bind Glyph}" FontSize="22" Foreground="White" Visibility="{Binding IconPath, Converter={StaticResource AppIcon}, ConverterParameter=fallback}" />
+                                                        <Image Source="{Binding IconPath, Converter={StaticResource AppIcon}}" Stretch="Uniform" />
+                                                    </Grid>
                                                 </Border>
                                                 <Button Background="Transparent" BorderThickness="0" Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top"
                                                         Click="Favorite_Click" Tag="{x:Bind PackageName}" AutomationProperties.Name="{x:Bind FavoriteLabel}"
@@ -154,8 +159,8 @@
                                     <StackPanel Spacing="8">
                                         <TextBlock Text="关于这个版本" FontSize="16" FontWeight="SemiBold" />
                                         <TextBlock Text="应用名称和包名实时从所选手机读取。双击应用卡片可打开独立窗口；在运行中页面切回或关闭。窗口不转发声音。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="应用图标暂用统一占位图形。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="主题与收藏只在本次运行中生效。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="图标从手机应用资源读取；个别读取失败时显示占位图。拖出应用卡片，或右键创建桌面快捷方式。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="主题与收藏保存在当前 Windows 用户的本地设置中。快捷方式需要对应手机在线并已授权 ADB；移动程序目录后需重新创建。" Style="{StaticResource SectionHint}" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

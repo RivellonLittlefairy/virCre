@@ -18,6 +18,7 @@ public sealed partial class MainWindow {
         if (closing) return;
         ActionNotice.Severity = error ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
         ActionNotice.Title = message;
+        ActionNotice.ActionButton = null;
         ActionNotice.IsOpen = true;
     }
     private async void OpenApp_Click(object sender, RoutedEventArgs args) {

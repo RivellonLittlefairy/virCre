@@ -17,5 +17,9 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />
     <ProjectReference Include="../VirCre.Presentation/VirCre.Presentation.csproj" />
+    <Content Include="../../android-agent/build/icon-agent.jar" Link="Assets/icon-agent.jar" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="BuildIconAgent" BeforeTargets="PrepareForBuild">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-IconAgent.ps1&quot;" />
+  </Target>
 </Project>

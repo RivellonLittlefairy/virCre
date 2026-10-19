@@ -6,7 +6,7 @@ using VirCre.Presentation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
-    private readonly IPhoneCatalog phone = new PhoneCatalog(new CommandRunner());
+    private readonly IPhoneCatalog phone = new IconCatalog(new PhoneCatalog(new CommandRunner()),new CommandRunner(),Path.Combine(AppContext.BaseDirectory,"Assets","icon-agent.jar"),Path.Combine(DataDirectory,"icons"));
     private readonly CatalogController catalogController;
     private readonly CancellationTokenSource lifetime = new();
     private CancellationTokenSource? deviceScan;

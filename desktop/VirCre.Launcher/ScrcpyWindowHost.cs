@@ -13,9 +13,9 @@ public sealed partial class ScrcpyWindowHost : IAppWindowHost {
     public static IReadOnlyList<string> Arguments(AppLaunchRequest request) {
         if(!SerialPattern().IsMatch(request.Serial) || !PackagePattern().IsMatch(request.PackageName))
             throw new ArgumentException("设备或应用标识无效，请刷新列表后重试。");
-        return ["-s",request.Serial,"--new-display=1080x1920/420","--start-app="+request.PackageName,
+        return ["-s",request.Serial,"--new-display=1440x2560/480","--start-app="+request.PackageName,
             "--window-title="+request.Name+" · "+request.DeviceName+" · virCre","--no-audio","--display-ime-policy=local",
-            "--window-width=420","--window-height=760"];
+            "--window-width=720","--window-height=1280"];
     }
     public IAppWindowProcess Start(AppLaunchRequest request) {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("独立窗口需要 Windows。");

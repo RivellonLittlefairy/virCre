@@ -8,13 +8,16 @@ using Windows.UI;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow : Window {
-    private readonly ShellViewModel model = new();
+    private readonly ShellViewModel model;
     private bool ready;
     private XamlRoot? observedRoot;
     private double minimumScale;
     private bool allowClose;
 
     public MainWindow() {
+        var settings = LoadSettings();
+        RuntimeDiagnostics.Write("startup",details:DataDirectory);
+        model = new(settings: settings.Settings);
         catalogController = new(phone, model);
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
@@ -23,6 +26,10 @@ public sealed partial class MainWindow : Window {
         model.PropertyChanged += (_, _) => RenderState();
         AppGrid.ItemsSource = model.Apps;
         RunningList.ItemsSource = model.Running;
+        ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
+        Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
+        model.SettingsChanged += SaveSettings;
+        if (phone is VirCre.Launcher.IconCatalog icons) icons.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
         appWindows.Changed += AppWindows_Changed;
         appWindows.Problem += AppWindows_Problem;
         ready = true;
@@ -39,6 +46,8 @@ public sealed partial class MainWindow : Window {
             if (observedRoot != null) observedRoot.Changed -= XamlRoot_Changed;
         };
         RenderState();
+        if (settings.Warning != null) ShowAction(settings.Warning, true);
+        else if (StorageLocation.Warning != null) ShowAction(StorageLocation.Warning);
     }
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args) {
         if (allowClose) return;
@@ -49,7 +58,7 @@ public sealed partial class MainWindow : Window {
         Navigation.IsEnabled = false;
         FooterStatus.Text = "正在关闭应用窗口并停止设备读取…";
         lifetime.Cancel();
-        try { await Task.WhenAll(catalogController.StopAsync(), refreshTask, appWindows.StopAsync()); }
+        try { await Task.WhenAll(catalogController.StopAsync(), refreshTask, appWindows.StopAsync(), settingsTask, shortcutTask, nativeDragTask, Task.WhenAll(shortcutWrites.ToArray())); }
         catch (Exception error) {
             // Keep ownership and allow another title-bar close attempt instead of abandoning a live process.
             closing = false;
@@ -65,7 +74,8 @@ public sealed partial class MainWindow : Window {
         observedRoot = Root.XamlRoot;
         observedRoot.Changed += XamlRoot_Changed;
         var scale = Root.XamlRoot.RasterizationScale;
-        AppWindow.Resize(new SizeInt32((int)(1120 * scale), (int)(760 * scale)));
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary)?.WorkArea;
+        AppWindow.Resize(new SizeInt32(Math.Min((int)(1120 * scale),workArea?.Width??int.MaxValue), Math.Min((int)(760 * scale),workArea?.Height??int.MaxValue)));
         UpdateMinimumSize();
         if (DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary) is { } display) {
             var area = display.WorkArea;
@@ -80,8 +90,9 @@ public sealed partial class MainWindow : Window {
         if (scale == minimumScale) return;
         minimumScale = scale;
         if (AppWindow.Presenter is OverlappedPresenter presenter) {
-            presenter.PreferredMinimumWidth = (int)Math.Ceiling(900 * scale);
-            presenter.PreferredMinimumHeight = (int)Math.Ceiling(600 * scale);
+            var area=DisplayArea.GetFromWindowId(AppWindow.Id,DisplayAreaFallback.Primary)?.WorkArea;
+            presenter.PreferredMinimumWidth = Math.Min((int)Math.Ceiling(900 * scale),area?.Width??int.MaxValue);
+            presenter.PreferredMinimumHeight = Math.Min((int)Math.Ceiling(600 * scale),area?.Height??int.MaxValue);
         }
     }
 
@@ -108,6 +119,7 @@ public sealed partial class MainWindow : Window {
     private void Theme_SelectionChanged(object sender, SelectionChangedEventArgs e) {
         if (!ready) return;
         Root.RequestedTheme = ThemeChoice.SelectedIndex switch { 1 => ElementTheme.Light, 2 => ElementTheme.Dark, _ => ElementTheme.Default };
+        model.SetTheme(ThemeChoice.SelectedIndex switch {1=>"Light",2=>"Dark",_=>"System"});
     }
     private void UpdateCaptionColors() {
         var dark = Root.ActualTheme == ElementTheme.Dark;

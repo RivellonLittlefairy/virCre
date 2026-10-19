@@ -1,0 +1,13 @@
+<Project>
+  <!-- Old sandbox-created output directories can carry an inheritable Low MIC label.
+       A Low-labelled apphost launches at Low integrity even from a normal user shell.
+       Normalize only our generated executable images, never system or source-directory ACLs. -->
+  <Target Name="NormalizeExecutableIntegrity" AfterTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' And ('$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe') And Exists('$(TargetDir)$(AssemblyName).exe')">
+    <Exec Command="icacls &quot;$(TargetDir)$(AssemblyName).exe&quot; /setintegritylevel M" StandardOutputImportance="Low" />
+  </Target>
+  <Target Name="NormalizePublishedExecutableIntegrity" AfterTargets="Publish"
+          Condition="'$(OS)' == 'Windows_NT' And ('$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe') And Exists('$(PublishDir)$(AssemblyName).exe')">
+    <Exec Command="icacls &quot;$(PublishDir)$(AssemblyName).exe&quot; /setintegritylevel M" StandardOutputImportance="Low" />
+  </Target>
+</Project>

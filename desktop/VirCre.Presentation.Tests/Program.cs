@@ -76,6 +76,19 @@ await cancelledLoad;
 Require(!real.IsLoading && real.Apps.Count == 0, "Cancelled listing got stuck loading");
 Console.WriteLine("PASS: cancelled listing ends loading without partial data");
 
+var saved = new ShellViewModel(settings: new(["com.real.app","com.absent.app"],"Dark"));
+using(var persistedController=new CatalogController(new ImmediateCatalog(),saved)) {
+    await persistedController.SelectAsync(new("phone","Phone",VirCre.Launcher.DeviceState.Online));
+    Require(saved.Apps.Single().IsFavorite && saved.Apps.Single().IconPath=="C:\\icons\\real.png", "Saved favorite or real icon was not restored");
+    saved.Navigate("favorites");
+    Require(saved.Apps.Count==1 && saved.ExportSettings().Favorites.Contains("com.absent.app"),"Uninstalled favorite was displayed or lost");
+    saved.ToggleFavorite("com.real.app");
+    Require(saved.IsEmpty && !saved.ExportSettings().Favorites.Contains("com.real.app"),"Removing favorite was not persisted");
+    saved.SetTheme("Light");
+    Require(saved.ExportSettings().Theme=="Light","Theme was not included in persistent settings");
+}
+Console.WriteLine("PASS: saved favorites, real icons and theme survive catalog replacement");
+
 var shutdownModel = new ShellViewModel();
 var shutdownSource = new ControlledCatalog();
 var shutdownController = new CatalogController(shutdownSource, shutdownModel);
@@ -102,4 +115,8 @@ sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
         var completion = new TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>(TaskCreationOptions.RunContinuationsAsynchronously);
         Pending.Add(serial,completion);return completion.Task; // Deliberately ignores cancellation to reproduce a late old request.
     }
+}
+sealed class ImmediateCatalog : VirCre.Launcher.IPhoneCatalog {
+    public Task<IReadOnlyList<VirCre.Launcher.PhoneDevice>> GetDevicesAsync(CancellationToken token)=>throw new NotSupportedException();
+    public Task<IReadOnlyList<VirCre.Launcher.PhoneApp>> GetAppsAsync(string serial,CancellationToken token)=>Task.FromResult<IReadOnlyList<VirCre.Launcher.PhoneApp>>([new("Real","com.real.app",false,"C:\\icons\\real.png")]);
 }
