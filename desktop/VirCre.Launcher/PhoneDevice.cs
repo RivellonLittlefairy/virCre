@@ -11,4 +11,9 @@ public sealed record PhoneApp(string Name, string PackageName, bool IsSystem, st
 public interface IPhoneCatalog {
     Task<IReadOnlyList<PhoneDevice>> GetDevicesAsync(CancellationToken token);
     Task<IReadOnlyList<PhoneApp>> GetAppsAsync(string serial, CancellationToken token);
+    Task<IReadOnlyList<PhoneApp>> GetAppsAsync(string serial, CancellationToken token, bool forceRefresh) => GetAppsAsync(serial, token);
+}
+
+public interface ICatalogWarnings {
+    event Action<string>? Warning;
 }

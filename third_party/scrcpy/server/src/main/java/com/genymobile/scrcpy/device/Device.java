@@ -247,7 +247,7 @@ public final class Device {
     @SuppressLint("QueryPermissionsNeeded")
     private static List<ApplicationInfo> getLaunchableApps(PackageManager pm) {
         List<ApplicationInfo> result = new ArrayList<>();
-        for (ApplicationInfo appInfo : pm.getInstalledApplications(PackageManager.GET_META_DATA)) {
+        for (ApplicationInfo appInfo : pm.getInstalledApplications(0)) {
             if (appInfo.enabled && getLaunchIntent(pm, appInfo.packageName) != null) {
                 result.add(appInfo);
             }
@@ -275,13 +275,11 @@ public final class Device {
     public static DeviceApp findByPackageName(String packageName) {
         PackageManager pm = FakeContext.get().getPackageManager();
         // No need to filter by "launchable" apps, an error will be reported on start if the app is not launchable
-        for (ApplicationInfo appInfo : pm.getInstalledApplications(PackageManager.GET_META_DATA)) {
-            if (packageName.equals(appInfo.packageName)) {
-                return toApp(pm, appInfo);
-            }
+        try {
+            return toApp(pm, pm.getApplicationInfo(packageName, 0));
+        } catch (PackageManager.NameNotFoundException missing) {
+            return null;
         }
-
-        return null;
     }
 
     @SuppressLint("QueryPermissionsNeeded")

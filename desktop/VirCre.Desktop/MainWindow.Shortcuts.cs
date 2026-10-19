@@ -26,8 +26,8 @@ public sealed partial class MainWindow {
             var directory=new PhoneCatalog(runner);
             var devices=await directory.GetDevicesAsync(lifetime.Token);
             var device=await request.ResolveAsync(devices,(s,t)=>ShortcutRequest.GetHardwareIdAsync(runner,s,t),lifetime.Token);
-            var apps=await directory.GetAppsAsync(device.Serial,lifetime.Token);
-            if(!apps.Any(a=>a.PackageName==request.PackageName)) throw new IOException("手机中已找不到此应用，请刷新列表并重新创建快捷方式。");
+            if(!await directory.CanLaunchAsync(device.Serial,request.PackageName,lifetime.Token))
+                throw new IOException("手机中已找不到此应用的启动入口，请刷新列表并重新创建快捷方式。");
             var result=await appWindows.OpenAsync(new(device.Serial,device.Model,request.PackageName,request.Name),lifetime.Token);
             ShowAction(result.Activated?$"已打开 {request.Name}。":$"{request.Name} 窗口已存在，请从任务栏切回。");
         } catch(OperationCanceledException) { }

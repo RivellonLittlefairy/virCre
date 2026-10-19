@@ -20,6 +20,17 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
         EnsureSuccess(result, "应用列表");
         return ParseApps(result.Output + "\n" + result.Error);
     }
+    public async Task<bool> CanLaunchAsync(string serial, string packageName, CancellationToken token) {
+        _ = new ShortcutRequest(serial, "", "device", packageName, "app").Encode();
+        foreach (var category in new[] {"android.intent.category.LAUNCHER", "android.intent.category.LEANBACK_LAUNCHER"}) {
+            var result = await runner.RunAsync("adb", ["-s", serial, "shell", "cmd", "package", "resolve-activity", "--brief",
+                "-a", "android.intent.action.MAIN", "-c", category, "-p", packageName], TimeSpan.FromSeconds(8), token).ConfigureAwait(false);
+            EnsureSuccess(result, "应用启动入口");
+            if (result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(line => line.StartsWith(packageName + "/", StringComparison.Ordinal))) return true;
+        }
+        return false;
+    }
     private static void EnsureSuccess(CommandResult result, string operation) {
         if (result.ExitCode != 0) throw new IOException($"{operation}读取失败（退出码 {result.ExitCode}），请检查设备授权与连接后刷新。");
     }

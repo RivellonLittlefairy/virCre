@@ -6,7 +6,13 @@ using VirCre.Presentation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
-    private readonly IPhoneCatalog phone = new IconCatalog(new PhoneCatalog(new CommandRunner()),new CommandRunner(),Path.Combine(AppContext.BaseDirectory,"Assets","icon-agent.jar"),Path.Combine(DataDirectory,"icons"));
+    private readonly CachedPhoneCatalog phone = CreatePhoneCatalog();
+    private static CachedPhoneCatalog CreatePhoneCatalog() {
+        var runner = new CommandRunner();
+        var cache = new AppCatalogCache(Path.Combine(DataDirectory, "app-catalog"));
+        var live = new AgentPhoneCatalog(new PhoneCatalog(runner), runner, Path.Combine(AppContext.BaseDirectory, "Assets", "icon-agent.jar"), cache.IconDirectory);
+        return new(live, cache);
+    }
     private readonly CatalogController catalogController;
     private readonly CancellationTokenSource lifetime = new();
     private CancellationTokenSource? deviceScan;
@@ -14,17 +20,17 @@ public sealed partial class MainWindow {
     private bool syncingDevices, scanning, closing;
     private Task refreshTask = Task.CompletedTask;
 
-    private async void RefreshDevices_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
+    private async void RefreshDevices_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync(forceRefresh: true);
     private async void DevicePicker_SelectionChanged(object sender, SelectionChangedEventArgs e) {
         if (!ready || syncingDevices || closing || windowShutdown.HasStarted) return;
         await catalogController.SelectAsync(DevicePicker.SelectedItem as PhoneDevice, lifetime.Token);
     }
-    private Task RefreshDevicesAsync() {
+    private Task RefreshDevicesAsync(bool forceRefresh = false) {
         if(windowShutdown.HasStarted)return Task.CompletedTask;
-        refreshTask = RefreshDevicesCoreAsync();
+        refreshTask = RefreshDevicesCoreAsync(forceRefresh);
         return refreshTask;
     }
-    private async Task RefreshDevicesCoreAsync() {
+    private async Task RefreshDevicesCoreAsync(bool forceRefresh) {
         if (closing || windowShutdown.HasStarted) return;
         var generation = ++scanGeneration;
         deviceScan?.Cancel();
@@ -35,7 +41,8 @@ public sealed partial class MainWindow {
         DevicePicker.IsEnabled = false;
         RefreshDevices.IsEnabled = false;
         try {
-            await catalogController.SelectAsync(null, request.Token);
+            catalogController.CancelActive();
+            RenderState();
             var devices = await phone.GetDevicesAsync(request.Token);
             if (closing || windowShutdown.HasStarted || generation != scanGeneration || request.IsCancellationRequested) return;
             var selected = devices.FirstOrDefault(device => device.Serial == previous);
@@ -46,14 +53,17 @@ public sealed partial class MainWindow {
             scanning = false;
             DevicePicker.IsEnabled = true;
             RefreshDevices.IsEnabled = true;
-            await catalogController.SelectAsync(selected, request.Token);
+            if (selected?.State != DeviceState.Online && previous != null) {
+                var message = selected?.State == DeviceState.Unauthorized ? "请在手机上允许调试授权后刷新。" : "手机连接未确认，请检查连接后刷新。";
+                model.ReportDeviceError(message + "仍显示上次列表，暂不能启动应用。", preserveCatalog: true);
+            } else await catalogController.SelectAsync(selected, request.Token, forceRefresh);
         } catch (OperationCanceledException) { }
         catch (Exception error) when (CatalogErrors.IsExpected(error)) {
             if (!closing && !windowShutdown.HasStarted && generation == scanGeneration) {
                 syncingDevices = true;
                 try { DevicePicker.SelectedItem = null; DevicePicker.ItemsSource = null; }
                 finally { syncingDevices = false; }
-                model.ReportDeviceError(error.Message);
+                model.ReportDeviceError("设备读取失败，仍显示上次列表，暂不能启动应用。" + error.Message, preserveCatalog: true);
             }
         } finally {
             if (ReferenceEquals(deviceScan, request)) deviceScan = null;

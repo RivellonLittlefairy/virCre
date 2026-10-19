@@ -30,7 +30,7 @@ public sealed partial class MainWindow : Window {
         ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
         Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
         model.SettingsChanged += SaveSettings;
-        if (phone is VirCre.Launcher.IconCatalog icons) icons.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
+        phone.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
         appWindows.Changed += AppWindows_Changed;
         appWindows.Problem += AppWindows_Problem;
         ready = true;
@@ -165,7 +165,7 @@ public sealed partial class MainWindow : Window {
         SearchBox.IsEnabled = !cleanupOnly && !model.IsLoading && model.HasDevice;
         DevicePicker.IsEnabled=!cleanupOnly && !scanning;
         RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
-        AppGrid.IsEnabled=!cleanupOnly;ThemeChoice.IsEnabled=!cleanupOnly;
+        AppGrid.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading && model.HasDevice;ThemeChoice.IsEnabled=!cleanupOnly;
         foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
         if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;

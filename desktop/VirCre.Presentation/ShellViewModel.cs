@@ -36,7 +36,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
     public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
         IsLoading ? $"正在从 {DeviceLabel} 读取应用列表…" : ErrorMessage.Length > 0 ? ErrorMessage :
-        HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 可拖到桌面创建快捷方式" : "连接手机后，读取可启动的应用列表。";
+        HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 安装、卸载或更新应用后，请点击刷新" : "连接手机后，读取可启动的应用列表。";
     public string Title => Page switch {"favorites" => "收藏", "running" => "运行中", "settings" => "设置", _ => "全部应用"};
     public string Description => Page switch {
         "favorites" => "把常用的应用放在手边。",
@@ -80,7 +80,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         IsLoading=false;ErrorMessage="";Refresh();
     }
     internal void FailLoad(string error) {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();}
-    public void ReportDeviceError(string error) {BeginLoad(null);FailLoad(error);}
+    public void ReportDeviceError(string error, bool preserveCatalog = false) {
+        if (preserveCatalog && catalog.Count > 0) {
+            HasDevice=false;IsLoading=false;ErrorMessage=error;
+            Refresh();
+        } else {BeginLoad(null);FailLoad(error);}
+    }
     public void UpdateWindows(IReadOnlyList<AppWindowInfo> windows) {
         running.Clear();foreach(var window in windows)running.Add(window);
         NotifyState();

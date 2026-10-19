@@ -9,14 +9,20 @@ public sealed class CatalogController(IPhoneCatalog phone, ShellViewModel model)
     private bool disposed;
     private readonly List<Task> pending = [];
 
-    public Task SelectAsync(PhoneDevice? device, CancellationToken token = default) {
+    public void CancelActive() {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        generation++;
+        active?.Cancel();
+    }
+
+    public Task SelectAsync(PhoneDevice? device, CancellationToken token = default, bool forceRefresh = false) {
         ObjectDisposedException.ThrowIf(disposed, this);
         pending.RemoveAll(task => task.IsCompleted);
-        var work = SelectCoreAsync(device, token);
+        var work = SelectCoreAsync(device, token, forceRefresh);
         pending.Add(work);
         return work;
     }
-    private async Task SelectCoreAsync(PhoneDevice? device, CancellationToken token) {
+    private async Task SelectCoreAsync(PhoneDevice? device, CancellationToken token, bool forceRefresh) {
         var ticket = ++generation;
         active?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -24,7 +30,7 @@ public sealed class CatalogController(IPhoneCatalog phone, ShellViewModel model)
         model.BeginLoad(device);
         if (device?.State != DeviceState.Online) { active = null; return; }
         try {
-            var apps = await phone.GetAppsAsync(device.Serial, request.Token);
+            var apps = await phone.GetAppsAsync(device.Serial, request.Token, forceRefresh);
             if (!disposed && ticket == generation) {
                 request.Token.ThrowIfCancellationRequested();
                 model.CompleteLoad(apps);

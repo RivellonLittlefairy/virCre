@@ -40,6 +40,7 @@
                             </DataTemplate></ComboBox.ItemTemplate>
                         </ComboBox>
                         <Button x:Name="RefreshDevices" Content="刷新设备与应用" HorizontalAlignment="Stretch" Click="RefreshDevices_Click" />
+                        <TextBlock Text="启动使用缓存，应用变化后手动刷新。" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
             </NavigationView.PaneHeader>
