@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -ex
+. $(dirname ${BASH_SOURCE[0]})/_init "$@"
+
+# Google only provides x86 Windows platform-tools, so the same adb.exe is used
+# for all Windows targets (on Windows ARM64, it runs via emulation).
+
+VERSION=37.0.1
+URL="https://dl.google.com/android/repository/platform-tools_r$VERSION-win.zip"
+SHA256SUM=45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
+
+PROJECT_DIR="platform-tools-$VERSION-windows"
+FILENAME="$PROJECT_DIR.zip"
+
+cd "$SOURCES_DIR"
+
+if [[ -d "$PROJECT_DIR" ]]
+then
+    echo "$PWD/$PROJECT_DIR" found
+else
+    get_file "$URL" "$FILENAME" "$SHA256SUM"
+    mkdir -p "$PROJECT_DIR"
+    cd "$PROJECT_DIR"
+    ZIP_PREFIX=platform-tools
+    unzip "../$FILENAME" \
+        "$ZIP_PREFIX"/AdbWinApi.dll \
+        "$ZIP_PREFIX"/AdbWinUsbApi.dll \
+        "$ZIP_PREFIX"/adb.exe
+    mv "$ZIP_PREFIX"/* .
+    rmdir "$ZIP_PREFIX"
+fi
+
+mkdir -p "$INSTALL_DIR/adb-windows"
+cd "$INSTALL_DIR/adb-windows"
+cp -r "$SOURCES_DIR/$PROJECT_DIR"/. "$INSTALL_DIR/adb-windows/"
