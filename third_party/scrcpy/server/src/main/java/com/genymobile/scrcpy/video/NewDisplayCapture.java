@@ -17,6 +17,7 @@ import com.genymobile.scrcpy.opengl.OpenGLRunner;
 import com.genymobile.scrcpy.util.AffineMatrix;
 import com.genymobile.scrcpy.util.Ln;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
+import com.example.vircam.shell.ApplicationCameraSession;
 
 import android.graphics.Rect;
 import android.hardware.display.VirtualDisplay;
@@ -44,6 +45,7 @@ public class NewDisplayCapture extends SurfaceCapture {
 
     private final VirtualDisplayListener vdListener;
     private final NewDisplay newDisplay;
+    private final ApplicationCameraSession cameraSession;
 
     private final DisplayMonitor displayMonitor = new DisplayMonitor();
 
@@ -75,7 +77,12 @@ public class NewDisplayCapture extends SurfaceCapture {
     private int dpi;
 
     public NewDisplayCapture(VirtualDisplayListener vdListener, Options options) {
+        this(vdListener, options, null);
+    }
+
+    public NewDisplayCapture(VirtualDisplayListener vdListener, Options options, ApplicationCameraSession cameraSession) {
         this.vdListener = vdListener;
+        this.cameraSession = cameraSession;
         this.newDisplay = options.getNewDisplay();
         assert newDisplay != null;
         this.displayImePolicy = options.getDisplayImePolicy();
@@ -231,8 +238,14 @@ public class NewDisplayCapture extends SurfaceCapture {
                             | VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP;
                 }
             }
-            VirtualDisplay vd = ServiceManager.getDisplayManager()
-                    .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, flags);
+            VirtualDisplay vd;
+            if (cameraSession != null) {
+                cameraSession.attachEncoder(surface, displaySize.getWidth(), displaySize.getHeight(), dpi);
+                vd = cameraSession.getDisplay();
+            } else {
+                vd = ServiceManager.getDisplayManager()
+                        .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, flags);
+            }
             setCurrentVirtualDisplay(vd); // used for client resize
             int virtualDisplayId = vd.getDisplay().getDisplayId();
             Ln.i("New display: " + displaySize.getWidth() + "x" + displaySize.getHeight() + "/" + dpi + " (id=" + virtualDisplayId + ")");
@@ -303,7 +316,8 @@ public class NewDisplayCapture extends SurfaceCapture {
         if (virtualDisplay != null) {
             // synchronized with triggerResize()
             synchronized (this) {
-                virtualDisplay.release();
+                if (cameraSession != null) cameraSession.close();
+                else virtualDisplay.release();
                 setCurrentVirtualDisplay(null);
             }
         }

@@ -27,6 +27,7 @@ enum {
     OPT_RECORD_FORMAT,
     OPT_PREFER_TEXT,
     OPT_WINDOWS_IME,
+    OPT_WINDOW_EXCLUDE_FROM_CAPTURE,
     OPT_WINDOW_X,
     OPT_WINDOW_Y,
     OPT_WINDOW_WIDTH,
@@ -34,6 +35,7 @@ enum {
     OPT_WINDOW_BORDERLESS,
     OPT_MAX_FPS,
     OPT_DISPLAY_ID,
+    OPT_VIRCRE_CAMERA,
     OPT_RENDER_DRIVER,
     OPT_NO_MIPMAPS,
     OPT_VIDEO_CODEC_OPTIONS,
@@ -368,6 +370,13 @@ static const struct sc_option options[] = {
                 "The available display ids can be listed by:\n"
                 "    scrcpy --list-displays\n"
                 "Default is 0.",
+    },
+    {
+        .longopt_id = OPT_VIRCRE_CAMERA,
+        .longopt = "vircre-camera",
+        .argdesc = "association:session",
+        .text = "Use a virCre virtual camera with a directly encoded new display "
+                "(Android 16+). Requires --new-display.",
     },
     {
         .longopt_id = OPT_DISPLAY_IME_POLICY,
@@ -769,6 +778,12 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_POWER_OFF_ON_CLOSE,
         .longopt = "power-off-on-close",
         .text = "Turn the device screen off when closing scrcpy.",
+    },
+    {
+        .longopt_id = OPT_WINDOW_EXCLUDE_FROM_CAPTURE,
+        .longopt = "window-exclude-from-capture",
+        .text = "Exclude this Windows window from screen capture (virCre).\n"
+                "Fails if capture exclusion cannot be enabled.",
     },
     {
         .longopt_id = OPT_WINDOWS_IME,
@@ -2732,6 +2747,12 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_WINDOWS_IME:
                 opts->windows_ime = true;
                 break;
+            case OPT_VIRCRE_CAMERA:
+                opts->vircre_camera = optarg;
+                break;
+            case OPT_WINDOW_EXCLUDE_FROM_CAPTURE:
+                opts->window_exclude_from_capture = true;
+                break;
             case OPT_RAW_KEY_EVENTS:
                 if (opts->key_inject_mode != SC_KEY_INJECT_MODE_MIXED) {
                     LOGE("--prefer-text is incompatible with --raw-key-events");
@@ -3270,6 +3291,23 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
         }
     }
 
+    if (opts->vircre_camera
+            && (opts->display_id || !opts->new_display || !opts->control
+                || opts->video_source != SC_VIDEO_SOURCE_DISPLAY
+                || !opts->video)) {
+        LOGE("--vircre-camera requires a controlled new video display");
+        return false;
+    }
+    if (opts->window_exclude_from_capture) {
+#ifndef _WIN32
+        LOGE("--window-exclude-from-capture requires Windows");
+        return false;
+#endif
+        if (!opts->window || !opts->video_playback) {
+            LOGE("--window-exclude-from-capture requires a video window");
+            return false;
+        }
+    }
     if (opts->windows_ime) {
 #ifndef _WIN32
         LOGE("--windows-ime requires Windows");

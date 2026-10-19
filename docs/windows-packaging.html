@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>virCre · Windows 安装包方案与操作说明</title>
+  <style>
+    :root{color-scheme:light;--ink:#20382e;--green:#17684d;--line:#dbe5df}
+    *{box-sizing:border-box}body{margin:0;background:#f5f8f6;color:var(--ink);font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif}
+    main{max-width:1080px;margin:auto;padding:28px 24px 72px}header,section{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px 30px;margin:18px 0}
+    h1,h2,h3{color:var(--green);line-height:1.45}h1{font-size:30px}h2{font-size:23px}h3{font-size:18px}p,li{overflow-wrap:anywhere}a{color:var(--green)}
+    nav{display:flex;flex-wrap:wrap;gap:8px 20px}code{font-family:Consolas,"Microsoft YaHei",monospace;font-size:.92em}p code,li code,td code{background:#eff4f1;padding:2px 5px;border-radius:4px}
+    pre{padding:18px;background:#153c2c;color:#edf8f1;border-radius:9px;overflow:auto;line-height:1.65;tab-size:4}pre code{font-size:13px}
+    table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:10px 12px}th{background:#f1f6f3}
+    .table-wrap{overflow-x:auto}.note{background:#fff6df;border-left:4px solid #b58121;padding:12px 18px}.lead{font-size:18px}.muted{color:#52675d}.tag{display:inline-block;background:#e8f4ec;color:var(--green);padding:3px 12px;border-radius:20px;font-size:13px}
+    @media(max-width:640px){main{padding:12px 12px 40px}header,section{padding:18px}h1{font-size:25px}th,td{padding:8px}}
+    @media print{body{background:#fff}main{max-width:none;padding:0}header,section{border:0;padding:8px 0;margin:10px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f4f2;color:#142b20}h2,h3{break-after:avoid}tr{break-inside:avoid}nav{display:none}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="tag">首版 EXE 打包实施 · 安装验收待用户手动完成</span>
+    <h1>virCre 怎么打成 Windows 安装包</h1>
+    <p class="lead">推荐先用 <strong>Inno Setup 生成 EXE 安装包</strong>，同时保留便携 ZIP。现有 WinUI 3 程序已有自包含发布流程，下一步是在完整发布目录外增加安装器。</p>
+    <p>如果必须交付 <code>.msi</code>，可以用 WiX Toolset 包装同一份发布目录。普通用户双击安装、创建快捷方式和卸载，EXE 安装器已经能满足需求。</p>
+    <p class="muted">实施日期：2026-10-19。依据用户要求新增Inno Setup安装器与一键构建脚本，迁移正式相机Java源码，制作0.1首版包。本次源码按0.1版本整理提交，并向GitHub的v0.1 Release发布成品；安装、卸载、升级与真实设备功能由用户手动验收。</p>
+    <nav aria-label="文档目录">
+      <a href="#implementation">本次实施</a><a href="#current">现有能力</a><a href="#formats">格式选择</a><a href="#publish">发布命令</a><a href="#installer">EXE 配置</a><a href="#msi">MSI 路线</a><a href="#android">Android 清理</a><a href="#verify">验收</a><a href="#sources">依据</a>
+    </nav>
+  </header>
+
+  <section id="implementation">
+    <h2>本次实施与使用入口</h2>
+    <p>新增<code>packaging/virCre.iss</code>和<code>tools/Build-Installer.ps1</code>，采用文中固定AppId，当前用户安装到<code>%LOCALAPPDATA%\Programs\virCre</code>。提供开始菜单入口、可选桌面快捷方式和系统卸载入口，默认保留用户设置、缓存与应用图标。</p>
+    <pre><code># 完整重编译release自定义scrcpy、发布、编译安装器、生成ZIP与SHA256。
+pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1
+
+# 仅在确认release自定义运行时已重新构建时，复用这份缓存。
+pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1 -SkipRuntimeBuild</code></pre>
+    <p>输出位于<code>out/installers/</code>：<code>virCre-0.1-win-x64-setup.exe</code>、<code>virCre-0.1-win-x64-portable.zip</code>、<code>virCre-0.1-SHA256SUMS.txt</code>及<code>virCre-0.1-build.json</code>。每次构建使用新的package-staging目录，安装器和ZIP只来自该完整发布目录，不打包仓库、编译缓存、APK或设备日志。</p>
+    <p>构建脚本检查必需资源、runtime-manifest全部文件哈希、六个配套功能标记及release类型，统一主程序和安装器版本。按照用户“不自动测试”的要求，只做编译和文件检查，不执行测试、不启动主程序、不安装成品、不操作手机。本机Inno Setup 6.7.3工具使用官方签名安装文件的便携模式放在<code>.cache/toolchains/inno-setup-6.7.3</code>，不修改全局PATH。</p>
+    <p>正式相机源码的9个Java文件已复制到<code>camera-agent/src/main/java/com/example/vircam/</code>，与迁移前逐文件SHA256一致。<code>Build-Scrcpy.ps1</code>和独立agent构建脚本均改用新路径，Release客户端/server已经重新编译成功。原<code>android/</code>探针APK工程及根目录Gradle遗留项现已由用户手动清理，不再参与正式构建，也不会进入安装包。</p>
+    <p>成品尚未做代码签名，不能将编译成功描述为干净系统安装、覆盖升级、卸载或设备功能已验收。安装前正常关闭virCre及它打开的投屏窗口；用户可用EXE安装，或将完整ZIP解压到固定位置使用。升级或卸载还需手动确认常驻ADB占用文件时的安装器处理，不自动终止系统中的其他ADB会话。</p>
+    <p>本次编译已成功生成EXE和ZIP，主程序与安装器文件版本均为0.1.0.0。独立静态审查未发现明确Critical/Important；首轮ZIP中央目录563个文件与发布目录一致，主EXE位于根，运行时和图标DEX路径齐全。最终交付前同步本页与当前使用说明，再重新制作同版本包并核对清单、ZIP文件及SHA256。没有自动安装或运行成品。</p>
+  </section>
+
+  <section id="current">
+    <h2>1. 当前项目已经具备什么</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>项目</th><th>当前代码中的事实</th><th>打包时的含义</th></tr></thead>
+      <tbody>
+        <tr><td>桌面框架</td><td><code>VirCre.Desktop</code> 使用 WinUI 3、.NET 8，目标为 <code>net8.0-windows10.0.19041.0</code>。</td><td>按 Windows 10 2004 / 19041 或更高版本的 x64 桌面程序打包。</td></tr>
+        <tr><td>部署方式</td><td><code>WindowsPackageType=None</code>，<code>SelfContained=true</code>，<code>WindowsAppSDKSelfContained=true</code>。</td><td>当前是无包身份部署，适合完整目录加 Inno Setup 或 WiX；不必先改成 MSIX。</td></tr>
+        <tr><td>发布入口</td><td>已有 <code>tools/Publish-Desktop.ps1</code>。</td><td>先得到可独立分发的文件夹，再把文件夹装进安装器。</td></tr>
+        <tr><td>连接组件</td><td>项目构建目标会复制 <code>runtime/scrcpy/</code>；<code>BundledTools</code> 使用程序目录中的 ADB、scrcpy 和 server。</td><td>完整复制运行目录和 DLL，不依赖用户 PATH 中的其他 scrcpy。</td></tr>
+        <tr><td>图标组件</td><td>构建调用 <code>Build-IconAgent.ps1</code>，复制 <code>Assets/icon-agent.jar</code>。</td><td>JAR 是运行时资源，必须随包分发。</td></tr>
+        <tr><td>界面资源</td><td>项目显式把生成的 <code>VirCre.Desktop.pri</code> 加入发布文件。</td><td>不能漏掉 PRI；仅复制主 EXE 会丢失依赖与界面资源。</td></tr>
+        <tr><td>已有验证</td><td><code>Test-DesktopPublish.ps1</code> 检查发布目录，提供 <code>-SmokeTest</code> 启动检查。</td><td>可以作为安装器制作前的一道检查；不能代替干净机器和真机验收。</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note"><strong>当前文档存在历史差异：</strong>README 仍写着 ADB 和 scrcpy 不随程序分发，但当前发布脚本、项目文件和 <code>BundledTools.cs</code> 已实现内置运行时。本文采用当前代码中的事实。正式发布时应同步更新旧说明。</p>
+  </section>
+
+  <section id="formats">
+    <h2>2. EXE、MSI、MSIX 和 ZIP 怎么选</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>格式</th><th>适用场景</th><th>本项目的取舍</th></tr></thead>
+      <tbody>
+        <tr><td><strong>EXE · 推荐</strong></td><td>面向普通用户的安装向导、快捷方式、卸载和静默安装。</td><td>Inno Setup 直接收集发布目录，配置较少。默认按当前用户安装，可以避免日常安装时申请管理员权限。</td></tr>
+        <tr><td>MSI</td><td>企业软件分发、Windows Installer 管理、组织要求统一使用 MSI。</td><td>使用 WiX Toolset；需要维护组件、升级标识和安装范围，工作量通常多一些。</td></tr>
+        <tr><td>MSIX</td><td>需要包身份、商店或组织内的 MSIX 分发。</td><td>需要单独验证包身份、签名信任、子进程和桌面快捷方式路径。当前项目先不优先采用。</td></tr>
+        <tr><td>ZIP</td><td>内部测试、免安装试用、便携分发。</td><td>压缩整个发布目录即可；用户需手动解压到固定位置，没有安装器提供的卸载入口。</td></tr>
+      </tbody>
+    </table></div>
+    <p>安装器自身是一个 EXE，程序安装后仍然是包含多个文件的目录。将全部 WinUI、.NET 和 scrcpy 组件强行合成单个应用 EXE，会增加资源和依赖问题，对当前目标没有必要。</p>
+    <p>建议成品命名：<code>virCre-0.1-win-x64-setup.exe</code> 和 <code>virCre-0.1-win-x64-portable.zip</code>。用户指定当前对外版本为0.1，Windows文件版本为0.1.0.0。</p>
+  </section>
+
+  <section id="publish">
+    <h2>3. 先生成完整桌面发布目录</h2>
+    <h3>3.1 构建机器和用户电脑的要求不同</h3>
+    <p>构建机器需要 .NET SDK 8、PowerShell 7，以及现有脚本要求的 Android SDK API 36、Build Tools、JDK。重新编译自定义 scrcpy 还需要 GCC、Meson、Ninja、pkgconf；当前脚本默认从 <code>.cache/toolchains/msys64/ucrt64</code> 读取工具链。完整准备过程见 <a href="windows-ime-plan.html">现有源码构建计划</a>。</p>
+    <p>用户电脑不需要 Android Studio、JDK、Android SDK、.NET SDK 或编译器。自包含配置负责随包带上 .NET 和 Windows App SDK 依赖。USB 驱动、手机调试授权、无线调试配对仍需按设备实际情况完成；安装器无法替代手机上的授权操作。</p>
+    <p>手机兼容性另算：当前自定义 server 的 DEX 构建指定 <code>--min-api 36</code>，包含虚拟摄像头的完整路径以 Android 16（API 36）为目标。Windows 安装器支持 Windows 10，并不意味着手机端也兼容旧版 Android。</p>
+    <p>是否还需要补充 Visual C++ Redistributable x64，应以干净 Windows 的实际启动结果和缺失 DLL 诊断为准。开发机上能打开程序，不能证明目标机器已经具备全部本机依赖。</p>
+    <h3>3.2 当前功能应选择 Custom 运行时</h3>
+    <p><code>Publish-Desktop.ps1</code> 默认是 <code>-Runtime Official</code>，对应官方 scrcpy。当前中文输入和虚拟摄像头路径使用修改版客户端、server 及共享 Java 代码，应显式指定 <code>-Runtime Custom</code>。</p>
+    <p class="note"><code>-Runtime Custom</code> 只选择并校验已有自定义运行时，<strong>不会自动根据最新源码重新编译 scrcpy</strong>。发布前应先完成自定义运行时构建，避免把旧缓存与新桌面程序放在一起。</p>
+    <p>下面是原方案的分步命令，包含需要用户另行决定的测试步骤；本次自动执行使用上方一键脚本，不执行测试或启动检查。手动验收时从仓库根目录执行：</p>
+    <pre><code>Set-Location 'C:\Users\msf\AndroidStudioProjects\virCre'
+
+# 1. 重新构建配套的自定义 scrcpy 客户端与 server。
+pwsh -NoProfile -File .\tools\Build-Scrcpy.ps1 -BuildType release
+if ($LASTEXITCODE -ne 0) { throw 'Custom scrcpy build failed' }
+
+# 2. 使用全新目录，避免旧版本文件残留。
+$publish = Join-Path $PWD ('out\package-staging-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+pwsh -NoProfile -File .\tools\Publish-Desktop.ps1 `
+    -Runtime Custom `
+    -OutputDirectory $publish `
+    -GuidePage virtual-camera-window.html
+if ($LASTEXITCODE -ne 0) { throw 'Desktop publish failed' }
+
+# 3. 现有发布脚本本身会做基础检查；这里额外验证运行时哈希和无工具链 PATH 启动。
+pwsh -NoProfile -File .\tools\Test-CustomScrcpy.ps1 `
+    -RuntimeDirectory (Join-Path $publish 'runtime\scrcpy') `
+    -RequireWindowsIme
+if ($LASTEXITCODE -ne 0) { throw 'Bundled runtime validation failed' }
+
+# 4. 先关闭已打开的 virCre，再执行启动检查。
+pwsh -NoProfile -File .\tools\Test-DesktopPublish.ps1 `
+    -OutputDirectory $publish -SmokeTest
+if ($LASTEXITCODE -ne 0) { throw 'Desktop startup validation failed' }</code></pre>
+    <p><code>Build-Scrcpy.ps1 -BuildType release</code> 会执行现有自定义运行时检查，但其脚本中的 Meson 单元测试分支只在 <code>debug</code> 构建时运行。发布验收仍需另行安排相关测试，不能把 release 构建成功写成全部测试通过。</p>
+    <h3>3.3 发布目录至少应包括</h3>
+    <pre><code>package-staging-.../
+  VirCre.Desktop.exe
+  VirCre.Desktop.dll
+  VirCre.Desktop.pri
+  VirCre.Desktop.runtimeconfig.json
+  Microsoft.UI.Xaml.dll
+  ... .NET、WinUI 和其他依赖文件
+  Assets/
+    icon-agent.jar
+  runtime/scrcpy/
+    scrcpy.exe
+    scrcpy-server
+    adb.exe
+    AdbWinApi.dll
+    AdbWinUsbApi.dll
+    SDL3.dll
+    ... FFmpeg、libusb 等 DLL
+    runtime-manifest.json
+    LICENSE.txt
+    licenses/
+  docs/
+  使用说明.html</code></pre>
+    <p>上面只是关键文件示意，不是手工筛选名单。安装器应完整复制实际发布目录；不要按这张示意图遗漏其他依赖文件。</p>
+  </section>
+
+  <section id="installer">
+    <h2>4. 推荐方案：Inno Setup 生成 EXE 安装器</h2>
+    <p>从 <a href="https://jrsoftware.org/isdl.php">Inno Setup 官方下载页</a>安装编译器。2026-10-19 查看该页面时，同时提供 6.7.3 和 7.1.0；下面示例采用 6.x 常用脚本格式。编译器只需装在制作安装包的电脑上。</p>
+    <h3>4.1 建议的安装行为</h3>
+    <ul>
+      <li>默认目录：<code>%LOCALAPPDATA%\Programs\virCre</code>，当前用户安装。</li>
+      <li>创建开始菜单入口，桌面快捷方式由用户勾选。</li>
+      <li>在 Windows“已安装的应用”中提供卸载入口。</li>
+      <li>更新时保留固定安装目录和固定 AppId，减少手机应用快捷方式失效。</li>
+      <li>卸载时默认保留 <code>%LOCALAPPDATA%\virCre</code> 下的设置、收藏和图标；不要递归删除用户数据目录。</li>
+      <li>更新和卸载前先关闭 virCre 及由它打开的应用窗口，避免仍在运行的 scrcpy 占用文件。</li>
+    </ul>
+    <h3>4.2 可供实施的完整 .iss 示例</h3>
+    <p>当前已新增<code>packaging/virCre.iss</code>，采用下面的安装布局，并增加统一的文件版本。AppId在首次采用后保持不变；实际构建以仓库中的脚本为准。</p>
+    <pre><code>#ifndef PublishDir
+  #error PublishDir is required
+#endif
+#ifndef SetupDir
+  #error SetupDir is required
+#endif
+#ifndef AppVersion
+  #define AppVersion "0.1"
+#endif
+
+[Setup]
+AppId={{69B8728E-504C-4DE2-A978-E9C597B592DB}
+AppName=virCre
+AppVersion={#AppVersion}
+AppPublisher=virCre
+DefaultDirName={localappdata}\Programs\virCre
+DefaultGroupName=virCre
+DisableProgramGroupPage=yes
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64os
+ArchitecturesInstallIn64BitMode=x64os
+MinVersion=10.0.19041
+WizardStyle=modern
+Compression=lzma2
+SolidCompression=yes
+OutputDir={#SetupDir}
+OutputBaseFilename=virCre-{#AppVersion}-win-x64-setup
+UninstallDisplayIcon={app}\VirCre.Desktop.exe
+CloseApplications=yes
+CloseApplicationsFilter=VirCre.Desktop.exe
+RestartApplications=no
+SetupLogging=yes
+
+[Tasks]
+Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: unchecked
+
+[Files]
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{autoprograms}\virCre\virCre"; Filename: "{app}\VirCre.Desktop.exe"; WorkingDir: "{app}"
+Name: "{autoprograms}\virCre\使用说明"; Filename: "{app}\使用说明.html"
+Name: "{autodesktop}\virCre"; Filename: "{app}\VirCre.Desktop.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\VirCre.Desktop.exe"; Description: "启动 virCre"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent</code></pre>
+    <p>这里用 <code>x64os</code> 将首版安装范围限制在原生 x64 Windows；当前项目没有完成 Windows ARM64 适配验收。如果以后支持 ARM64，应一起调整主程序、scrcpy、ADB 与安装器，而不只是放宽架构检查。</p>
+    <p>此示例使用 Inno Setup 的默认安装界面语言，含中文的任务和入口文字按脚本设置显示。如需完整中文向导，应另行加入兼容版本的中文语言文件。示例没有设置应用专用 ICO；正式发布可以再补图标。</p>
+    <h3>4.3 编译安装包，并生成 ZIP</h3>
+    <p>在未来实际创建了上面的 .iss 文件，并完成第 3 节发布后，继续在同一 PowerShell 会话中执行：</p>
+    <pre><code># 按本机实际安装位置调整。
+$compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+$version = '0.1'
+$setupDir = Join-Path $PWD 'out\installers'
+New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
+
+&amp; $compiler "/DPublishDir=$publish" "/DSetupDir=$setupDir" `
+    "/DAppVersion=$version" '.\packaging\virCre.iss'
+if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+
+$zip = Join-Path $setupDir "virCre-$version-win-x64-portable.zip"
+Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $zip -Force
+
+$setup = Join-Path $setupDir "virCre-$version-win-x64-setup.exe"
+Get-FileHash -Algorithm SHA256 -LiteralPath $setup, $zip</code></pre>
+    <p>预期输出是 <code>out/installers/virCre-0.1-win-x64-setup.exe</code> 和同目录的 ZIP。这里的 <code>$publish</code> 必须指向已经检查通过的完整目录；不要把仓库根目录传给安装器，避免把缓存、源码、设备日志等一起装进去。</p>
+    <p>现已提供<code>tools/Build-Installer.ps1</code>统一这些步骤。它将版本传入<code>Publish-Desktop.ps1 -Version</code>，调用Inno Setup后生成ZIP与校验值；只做静态文件检查，不执行功能或安装测试。</p>
+  </section>
+
+  <section id="msi">
+    <h2>5. 如果明确需要 MSI</h2>
+    <p>选择 WiX Toolset。第 3 节仍然适用，MSI 与 EXE 可以使用同一份完整发布目录。两者是不同安装系统；把 EXE 后缀改成 MSI 没有作用。</p>
+    <ol>
+      <li>固定一个 WiX Toolset 版本，新增 WiX 工程和产品定义，明确安装到当前用户还是所有用户。</li>
+      <li>收集完整发布目录，保留相对路径，并维护 Windows Installer 组件标识的稳定性。</li>
+      <li>配置开始菜单、可选桌面快捷方式、产品版本及稳定的 UpgradeCode。</li>
+      <li>实现并验证 major upgrade 策略，检查旧版本卸载顺序、失败回滚和用户数据保留。</li>
+      <li>用标准用户与管理员场景分别测试，确认安装范围与升级规则一致。</li>
+    </ol>
+    <p>制作成功后，MSI 的典型静默安装命令如下。<code>/qn</code> 不会自动授予管理员权限；所有用户安装仍需相应权限。</p>
+    <pre><code>msiexec.exe /i "virCre-0.1-win-x64.msi" /qn /norestart /L*v "virCre-install.log"</code></pre>
+    <p>当前仓库没有 WiX 工程，因此不能给出一条现成命令直接生成 MSI。普通个人分发优先完成 EXE；有企业部署要求时，再增加 MSI 更合适。</p>
+  </section>
+
+  <section id="android">
+    <h2>6. Android 测试项目清理</h2>
+    <p>正式依赖迁移已完成，旧<code>android/</code>及根目录Gradle遗留项已清理。下面的表格保留迁移前的依赖说明，实际共享源码现在位于<code>camera-agent/src/main/java/com/example/vircam/</code>，两个构建脚本均已更新。</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>目录或文件</th><th>当前用途</th><th>后续处理建议</th></tr></thead>
+      <tbody>
+        <tr><td><code>android/app/src/main/java/com/example/vircam/shell/</code></td><td><code>Build-Scrcpy.ps1</code> 收集这里的全部 Java 类，server 已引用 <code>ApplicationCameraSession</code>。</td><td>先迁入独立 agent 源码目录，保留包名和现有改动，再改构建脚本。</td></tr>
+        <tr><td><code>core/FrameProtocol.java</code>、<code>LatestFrame.java</code>、<code>FrameMarker.java</code></td><td>同样被 scrcpy server 和独立相机 agent 构建使用。</td><td>与 shell 源码一起迁移，确认其引用关系完整。</td></tr>
+        <tr><td><code>tools/Build-VirtualCameraAgent.ps1</code></td><td>当前仍从 <code>android/app/src/main/java/...</code> 取源文件。</td><td>如保留此工具，同步修改源码路径；不再使用则单独移除，避免留下坏入口。</td></tr>
+        <tr><td><code>android-agent/src/main/java/com/vircre/icons/</code></td><td>生成桌面应用读取手机图标用的 DEX JAR。</td><td>保留；这不是可随意删除的测试 APK 工程。</td></tr>
+        <tr><td>Compose Activity、Camera2 探针、APK 测试及 Gradle 工程</td><td>旧 P0 测试入口。</td><td>在共享源码迁移和回归通过后，按实际需求删除或归档。</td></tr>
+        <tr><td><code>tools/Build.ps1</code>、<code>Start-P0.ps1</code>、<code>Start-Desktop.ps1 -CameraLab</code></td><td>旧 APK 构建、P0 会话和 WinForms 实验入口。</td><td>若退出维护，同步移除入口、文档及调用者，避免删除工程后仍提示用户运行它们。</td></tr>
+      </tbody>
+    </table></div>
+    <p>建议顺序：保留当前未提交改动，迁移共享 Java 源码，更新 <code>Build-Scrcpy.ps1</code> 和相关 agent 构建路径，重新构建并验证完整功能，最后再清理探针 App 与失效入口。</p>
+    <p>删除探针 App 后，开发机仍可能需要 Android SDK 和 JDK，因为自定义 scrcpy server 与图标 agent 仍需编译 Android DEX。用户电脑只接收构建好的运行资源，不需要这些开发工具。</p>
+  </section>
+
+  <section id="verify">
+    <h2>7. 什么情况才能说“安装包可以交付”</h2>
+    <ol>
+      <li><strong>发布检查：</strong>完整目录检查、配套运行时文件哈希和主窗口启动检查通过。</li>
+      <li><strong>干净系统：</strong>在未安装 Android Studio、.NET SDK、开发用 scrcpy 的 Windows x64 环境中完成安装与启动。静态目录检查无法覆盖这一项。</li>
+      <li><strong>真实手机：</strong>完成调试授权后读取应用、图标、打开独立窗口，并验证当前中文输入和虚拟摄像头功能。Windows 沙盒可检查安装和启动，不能替代真实设备及 USB 通路验收。</li>
+      <li><strong>快捷方式：</strong>开始菜单和桌面入口有效；从应用创建的手机 App 快捷方式在退出、重启及覆盖升级后仍能找到主程序。</li>
+      <li><strong>更新和卸载：</strong>验证新装、同版本重装、旧版本升级、运行时文件占用、卸载后再次安装，以及设置和收藏的保留策略。</li>
+      <li><strong>分发材料：</strong>确定主项目许可证，带上第三方许可和所需源码/构建材料；不要遗漏 <code>runtime/scrcpy/licenses</code>。</li>
+    </ol>
+    <p>代码签名不是本地生成 EXE 安装包的前提。公开分发时建议签名并加可信时间戳，便于用户确认发布者；签名本身不保证 SmartScreen 不提示。当前检查没有验证签名、干净系统安装、覆盖升级或设备功能。</p>
+    <p>安装器版本和应用程序集版本已由Build-Installer与Publish-Desktop的Version参数统一；0.1对应EXE文件版本0.1.0.0。后续升级应递增版本并验证固定目录、用户数据和快捷方式。</p>
+  </section>
+
+  <section id="sources">
+    <h2>8. 检查依据与实施范围</h2>
+    <p>本次实施范围是源码依赖迁移、构建路径更新、版本传递、Inno安装器与便携包制作。Android目录已由用户手动删除。未制作MSI，未执行成品安装或卸载、主程序运行、真机操作与功能测试。构建结果见本页“本次实施”记录。</p>
+    <h3>本地源码</h3>
+    <ul>
+      <li><a href="../desktop/VirCre.Desktop/VirCre.Desktop.csproj">VirCre.Desktop.csproj</a>：框架、架构、自包含、PRI、图标组件及运行时复制。</li>
+      <li><a href="../tools/Publish-Desktop.ps1">Publish-Desktop.ps1</a>：Official / Custom 参数、发布、检查和文档复制。</li>
+      <li><a href="../tools/Build-Scrcpy.ps1">Build-Scrcpy.ps1</a>：自定义客户端、server、共享 Android Java 代码与运行时清单。</li>
+      <li><a href="../tools/Prepare-CustomScrcpyRuntime.ps1">Prepare-CustomScrcpyRuntime.ps1</a>、<a href="../tools/Test-CustomScrcpy.ps1">Test-CustomScrcpy.ps1</a>：缓存完整性和运行时检查。</li>
+      <li><a href="../tools/Build-IconAgent.ps1">Build-IconAgent.ps1</a>、<a href="../tools/Build-VirtualCameraAgent.ps1">Build-VirtualCameraAgent.ps1</a>：两个独立 agent 的构建依赖。</li>
+      <li><a href="../tools/Test-DesktopPublish.ps1">Test-DesktopPublish.ps1</a>：发布目录基础检查和启动检查的实际覆盖范围。</li>
+      <li><a href="../desktop/VirCre.Launcher/BundledTools.cs">BundledTools.cs</a>：程序使用自己的 ADB、scrcpy 与 server。</li>
+    </ul>
+    <h3>官方资料</h3>
+    <ul>
+      <li><a href="https://jrsoftware.org/isdl.php">Inno Setup 下载页</a>与<a href="https://jrsoftware.org/ishelp/">官方帮助</a>。</li>
+      <li><a href="https://jrsoftware.org/ishelp/topic_setup_privilegesrequired.htm">PrivilegesRequired</a>、<a href="https://jrsoftware.org/ishelp/topic_setup_architecturesallowed.htm">ArchitecturesAllowed</a>、<a href="https://jrsoftware.org/ishelp/topic_setup_minversion.htm">MinVersion</a>：安装权限、架构和系统版本设置。</li>
+      <li><a href="https://docs.firegiant.com/wix/">WiX Toolset 文档</a>：MSI 的后续实现参考。</li>
+      <li><a href="https://learn.microsoft.com/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps">Windows App SDK 自包含部署</a>：运行依赖与部署方式参考。</li>
+    </ul>
+    <p><a href="index.html">项目文档首页</a> · <a href="virtual-camera-window.html">虚拟摄像头使用说明</a></p>
+  </section>
+</main>
+</body>
+</html>

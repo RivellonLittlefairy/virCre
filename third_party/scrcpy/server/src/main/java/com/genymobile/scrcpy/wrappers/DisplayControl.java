@@ -46,6 +46,7 @@ public final class DisplayControl {
         // only static methods
     }
 
+
     private static Method getGetPhysicalDisplayTokenMethod() throws NoSuchMethodException {
         if (getPhysicalDisplayTokenMethod == null) {
             getPhysicalDisplayTokenMethod = CLASS.getMethod("getPhysicalDisplayToken", long.class);

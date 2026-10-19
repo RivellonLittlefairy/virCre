@@ -13,14 +13,29 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public ShellViewModel(bool preview = false, UserSettings? settings = null) {
         IsPreview = preview;
         catalog = preview ? [.. DemoCatalog.Create()] : [];
-        if (settings != null) {favorites.UnionWith(settings.Favorites);Theme = settings.Theme;}
+        if (settings != null) {
+            favorites.UnionWith(settings.Favorites);Theme = settings.Theme;
+            VirtualCameraEnabled=settings.VirtualCameraEnabled;CameraFrameRate=CameraFrameRates.Normalize(settings.CameraFrameRate);
+        }
         Apps = new(visible);Running = new(running);Refresh();
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? SettingsChanged;
     public string Theme {get;private set;} = "System";
-    public UserSettings ExportSettings() => new(favorites.Order(StringComparer.Ordinal).ToArray(),Theme);
+    public bool VirtualCameraEnabled {get;private set;} = true;
+    public int CameraFrameRate {get;private set;} = CameraFrameRates.Default;
+    public UserSettings ExportSettings() => new(favorites.Order(StringComparer.Ordinal).ToArray(),Theme,
+        VirtualCameraEnabled:VirtualCameraEnabled,CameraFrameRate:CameraFrameRate);
     public void SetTheme(string theme) {Theme=theme is "Light" or "Dark"?theme:"System";SettingsChanged?.Invoke();}
+    public void SetVirtualCameraEnabled(bool enabled) {
+        if(VirtualCameraEnabled==enabled)return;
+        VirtualCameraEnabled=enabled;SettingsChanged?.Invoke();
+    }
+    public void SetCameraFrameRate(int frameRate) {
+        frameRate=CameraFrameRates.Validate(frameRate);
+        if(CameraFrameRate==frameRate)return;
+        CameraFrameRate=frameRate;SettingsChanged?.Invoke();
+    }
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
     public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
     public string CurrentSerial {get;private set;} = "";

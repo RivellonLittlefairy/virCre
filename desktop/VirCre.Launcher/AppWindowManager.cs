@@ -27,6 +27,8 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
         lock(sync) {
             if(stopped)throw new InvalidOperationException("程序正在退出，不能再打开应用。");
             reused=entries.TryGetValue((request.Serial,request.PackageName),out entry!);
+            if(reused && entry.Request.UseVirtualCamera!=request.UseVirtualCamera)
+                throw new InvalidOperationException("此应用已用另一种模式打开，请先在运行中页面关闭，再切换模式。");
             if(reused && entry.State is AppWindowState.Closing or AppWindowState.CloseFailed)
                 throw new InvalidOperationException("上一个应用窗口尚未关闭，请在运行中页面完成关闭后重试。");
             if(!reused) {entry=new(request);entries.Add((request.Serial,request.PackageName),entry);}
@@ -61,7 +63,7 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
     }
     private async Task StartAsync(Entry entry,CancellationToken caller) {
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token,caller,entry.CancelStart.Token);
-        deadline.CancelAfter(startupTimeout??TimeSpan.FromSeconds(30));
+        deadline.CancelAfter(startupTimeout??TimeSpan.FromSeconds(entry.Request.UseVirtualCamera ? 90 : 30));
         try {
             deadline.Token.ThrowIfCancellationRequested();
             var process=host.Start(entry.Request);

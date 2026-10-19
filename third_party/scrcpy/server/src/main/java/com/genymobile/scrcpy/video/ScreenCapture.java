@@ -186,6 +186,7 @@ public class ScreenCapture extends SurfaceCapture {
     public void release() {
         displayMonitor.stopAndRelease();
 
+
         if (display != null) {
             SurfaceControl.destroyDisplay(display);
             display = null;

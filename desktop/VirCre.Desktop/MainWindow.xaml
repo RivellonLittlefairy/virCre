@@ -92,7 +92,9 @@
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                             BorderThickness="1" CornerRadius="10" Padding="16" Tag="{Binding}" DoubleTapped="AppCard_DoubleTapped"
                                             PointerPressed="AppCard_PointerPressed" PointerMoved="AppCard_PointerMoved" PointerReleased="AppCard_PointerReleased" PointerCanceled="AppCard_PointerReleased" PointerCaptureLost="AppCard_PointerReleased">
-                                        <Border.ContextFlyout><MenuFlyout><MenuFlyoutItem Text="创建桌面快捷方式" Tag="{Binding}" Click="CreateShortcut_Click" /></MenuFlyout></Border.ContextFlyout>
+                                        <Border.ContextFlyout><MenuFlyout>
+                                            <MenuFlyoutItem Text="创建桌面快捷方式" Tag="{Binding}" Click="CreateShortcut_Click" />
+                                        </MenuFlyout></Border.ContextFlyout>
                                         <Grid RowSpacing="11">
                                             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                             <Grid>
@@ -126,14 +128,16 @@
                             </Style></ListView.ItemContainerStyle>
                             <ListView.ItemTemplate><DataTemplate x:DataType="launcher:AppWindowInfo">
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
-                                    <Grid ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <Grid ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <StackPanel Spacing="5" ToolTipService.ToolTip="{Binding Request.Serial}">
                                             <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                             <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Text="{Binding DeviceName}" Style="{StaticResource SectionHint}" /><TextBlock Text="{Binding StateLabel}" Style="{StaticResource SectionHint}" /></StackPanel>
+                                            <TextBlock Text="{Binding ModeLabel}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             <TextBlock Text="{Binding PackageName}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
-                                        <Button Grid.Column="1" Content="切回窗口" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Click="FocusWindow_Click" VerticalAlignment="Center" />
-                                        <Button Grid.Column="2" Content="关闭" Tag="{Binding Id}" IsEnabled="{Binding CanClose}" Click="CloseWindow_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="相机画面" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Visibility="{Binding IsVirtualCamera, Converter={StaticResource BoolVisibility}}" Click="CameraControl_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="切回窗口" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Click="FocusWindow_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="3" Content="关闭" Tag="{Binding Id}" IsEnabled="{Binding CanClose}" Click="CloseWindow_Click" VerticalAlignment="Center" />
                                     </Grid>
                                 </Border>
                             </DataTemplate></ListView.ItemTemplate>
@@ -157,11 +161,23 @@
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
+                                    <StackPanel Spacing="14">
+                                        <StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE722;" FontSize="18" /><TextBlock Text="虚拟摄像头" FontSize="16" FontWeight="SemiBold" /></StackPanel>
+                                        <ToggleSwitch x:Name="VirtualCameraToggle" Header="打开应用时启用虚拟摄像头" IsOn="True" OnContent="已开启" OffContent="已关闭" Toggled="VirtualCamera_Toggled" />
+                                        <TextBlock Text="将投屏窗口下方的桌面作为手机应用的相机画面，随窗口移动更新。开关对新打开的应用和桌面快捷方式生效，已有窗口保持当前模式。" Style="{StaticResource SectionHint}" />
+                                        <NumberBox x:Name="CameraFrameRateBox" Header="桌面相机目标帧率（fps）" Minimum="1" Maximum="30" Value="15" SmallChange="1" LargeChange="5"
+                                                   SpinButtonPlacementMode="Inline" Width="220" HorizontalAlignment="Left" ValueChanged="CameraFrameRate_ValueChanged" LostFocus="CameraFrameRate_LostFocus" />
+                                        <TextBlock Text="1–30fps，默认15fps。帧率修改会应用到正在运行的相机会话；实际帧率取决于电脑、手机与连接性能。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="实验版同时仅支持一个相机窗口，每次最长10分钟。需要同时打开其他普通窗口时，可先关闭此开关。" Style="{StaticResource SectionHint}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
                                     <StackPanel Spacing="8">
                                         <TextBlock Text="关于这个版本" FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="AboutVersion" Text="virCre" FontWeight="SemiBold" />
                                         <TextBlock Text="应用名称和包名实时从所选手机读取。双击应用卡片可打开独立窗口；在运行中页面切回或关闭。窗口不转发声音。" Style="{StaticResource SectionHint}" />
                                         <TextBlock Text="图标从手机应用资源读取；个别读取失败时显示占位图。拖出应用卡片，或右键创建桌面快捷方式。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="主题与收藏保存在当前 Windows 用户的本地设置中。快捷方式需要对应手机在线并已授权 ADB；移动程序目录后需重新创建。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="主题、收藏与虚拟摄像头设置保存在当前 Windows 用户的本地设置中。快捷方式需要对应手机在线并已授权 ADB；移动程序目录后需重新创建。" Style="{StaticResource SectionHint}" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

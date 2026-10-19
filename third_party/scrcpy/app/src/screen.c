@@ -1,6 +1,7 @@
 #include "screen.h"
 #ifdef _WIN32
 #include "sys/win/ime.h"
+#include "sys/win/capture.h"
 #endif
 
 #include <assert.h>
@@ -16,6 +17,9 @@
 #define DISPLAY_MARGINS 96
 
 #define DOWNCAST(SINK) container_of(SINK, struct sc_screen, frame_sink)
+
+static bool
+sc_screen_update_frame(struct sc_screen *screen, bool live_move);
 
 static void
 set_aspect_ratio(struct sc_screen *screen, struct sc_size content_size) {
@@ -413,6 +417,34 @@ event_watcher(void *data, SDL_Event *event) {
     struct sc_screen *screen = data;
     assert(screen->video);
 
+#ifdef _WIN32
+    if (!SDL_IsMainThread()) {
+        return true;
+    }
+    if (screen->live_move_rendering) {
+        return true;
+    }
+    // SDL's Windows modal move/resize timer emits EXPOSED(data1=1) on the UI
+    // thread even while SDL_WaitEvent() cannot return to the normal event loop.
+    if (screen->virtual_camera && event->type == SDL_EVENT_WINDOW_EXPOSED
+            && event->window.data1 == 1
+            && event->window.windowID == SDL_GetWindowID(screen->window)
+            && screen->window_shown && !screen->disconnected && !screen->paused) {
+        sc_tick now = sc_tick_now();
+        if (now - screen->live_move_last_render < SC_TICK_FROM_MS(33)) {
+            return true;
+        }
+        screen->live_move_last_render = now;
+        screen->live_move_rendering = true;
+        bool ok = sc_screen_update_frame(screen, true);
+        if (!ok) {
+            LOGE("Frame update during window move failed");
+        }
+        screen->live_move_rendering = false;
+        return true;
+    }
+#endif
+
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
             || event->type == SDL_EVENT_WINDOW_RESIZED) {
         // In practice, it seems to always be called from the same thread in
@@ -489,6 +521,10 @@ sc_screen_frame_sink_push(struct sc_frame_sink *sink, const AVFrame *frame) {
     bool previous_skipped = sc_frame_buffer_has_frame(&screen->fb);
     bool ok = sc_frame_buffer_push(&screen->fb, frame);
     screen->prevent_auto_resize = screen->current_session.video.client_resized;
+    bool notify = ok && !screen->frame_event_pending;
+    if (notify) {
+        screen->frame_event_pending = true;
+    }
     sc_mutex_unlock(&screen->mutex);
     if (!ok) {
         return SC_SINK_KO;
@@ -496,9 +532,9 @@ sc_screen_frame_sink_push(struct sc_frame_sink *sink, const AVFrame *frame) {
 
     if (previous_skipped) {
         sc_fps_counter_add_skipped_frame(&screen->fps_counter);
-        // The SC_EVENT_NEW_FRAME triggered for the previous frame will consume
-        // this new frame instead
-    } else {
+        // The latest frame replaces the previous one, including during live move.
+    }
+    if (notify) {
         // Post the event on the UI thread
         bool ok = sc_push_event(SC_EVENT_NEW_FRAME);
         if (!ok) {
@@ -524,6 +560,11 @@ sc_screen_init(struct sc_screen *screen,
 
     screen->resize_pending = false;
     screen->window_shown = false;
+    screen->frame_event_pending = false;
+#ifdef _WIN32
+    screen->live_move_rendering = false;
+    screen->live_move_last_render = 0;
+#endif
     screen->paused = false;
     screen->resume_frame = NULL;
     screen->orientation = SC_ORIENTATION_0;
@@ -535,6 +576,7 @@ sc_screen_init(struct sc_screen *screen,
     screen->window_aspect_ratio_lock = params->window_aspect_ratio_lock;
     screen->render_fit = params->render_fit;
     screen->flex_display = params->flex_display;
+    screen->virtual_camera = params->virtual_camera;
 
     screen->bg.r = (params->background_color >> 16) & 0xFF;
     screen->bg.g = (params->background_color >> 8) & 0xFF;
@@ -619,6 +661,11 @@ sc_screen_init(struct sc_screen *screen,
         goto error_destroy_fps_counter;
     }
 
+#ifdef _WIN32
+    if (params->window_exclude_from_capture && !sc_windows_exclude_from_capture(screen->window)) {
+        goto error_destroy_window;
+    }
+#endif
     screen->renderer = SDL_CreateRenderer(screen->window, NULL);
     if (!screen->renderer) {
         LOGE("Could not create renderer: %s", SDL_GetError());
@@ -859,6 +906,12 @@ sc_screen_destroy(struct sc_screen *screen) {
 #ifndef NDEBUG
     assert(!screen->open);
 #endif
+    screen->window_shown = false;
+#ifdef CONTINUOUS_RESIZING_WORKAROUND
+    if (screen->video) {
+        SDL_RemoveEventWatch(event_watcher, screen);
+    }
+#endif
     if (screen->disconnect_started) {
         sc_disconnect_destroy(&screen->disconnect);
     }
@@ -955,6 +1008,13 @@ sc_screen_set_orientation(struct sc_screen *screen,
                           enum sc_orientation orientation) {
     assert(screen->video);
 
+    // Desktop input follows this viewport in the registered camera's natural orientation.
+    // A client-only rotation would otherwise crop the wrong area below the window.
+    if (screen->virtual_camera && orientation != SC_ORIENTATION_0) {
+        LOGW("Client rotation is disabled while using the desktop virtual camera");
+        return;
+    }
+
     if (orientation == screen->orientation) {
         return;
     }
@@ -1013,8 +1073,23 @@ sc_screen_apply_frame(struct sc_screen *screen, bool can_resize) {
 }
 
 static bool
-sc_screen_update_frame(struct sc_screen *screen) {
+sc_screen_update_frame(struct sc_screen *screen, bool live_move) {
     assert(screen->video);
+
+    sc_mutex_lock(&screen->mutex);
+    if (!live_move) {
+        screen->frame_event_pending = false;
+    }
+    bool has_frame = sc_frame_buffer_has_frame(&screen->fb);
+    sc_mutex_unlock(&screen->mutex);
+    // The modal redraw may have consumed the frame before its normal event.
+    // Both consumers run on the UI thread; producers only replace the buffer.
+    if (!has_frame) {
+        if (live_move) {
+            sc_screen_render(screen, true);
+        }
+        return true;
+    }
 
     if (screen->paused) {
         if (!screen->resume_frame) {
@@ -1036,8 +1111,11 @@ sc_screen_update_frame(struct sc_screen *screen) {
     sc_mutex_lock(&screen->mutex);
     sc_frame_buffer_consume(&screen->fb, screen->frame);
     // read with lock held
-    bool can_resize = !screen->prevent_auto_resize;
+    bool can_resize = !live_move && !screen->prevent_auto_resize;
     sc_mutex_unlock(&screen->mutex);
+    if (live_move) {
+        sc_screen_update_content_rect(screen);
+    }
     return sc_screen_apply_frame(screen, can_resize);
 }
 
@@ -1236,7 +1314,7 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
             return;
         }
         case SC_EVENT_NEW_FRAME: {
-            bool ok = sc_screen_update_frame(screen);
+            bool ok = sc_screen_update_frame(screen, false);
             if (!ok) {
                 LOGE("Frame update failed\n");
             }

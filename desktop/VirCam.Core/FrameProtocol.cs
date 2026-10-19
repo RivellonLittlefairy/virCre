@@ -8,7 +8,11 @@ public sealed record Packet(MessageType Type,string Session,int DeviceId,long Se
     int Width,int Height,int Rotation,int Format,byte[] Payload);
 
 public static class FrameProtocol {
-    public const int HeaderSize=64, MaxPayload=1048576;
+    public const int HeaderSize=64, MaxPayload=4*1024*1024;
+    public const int MaxImageDimension=4096, MaxImagePixels=4096*2160, FormatPng=1, FormatJpeg=2;
+    public static bool IsSupportedImage(int width,int height,int format)=>
+        width>0 && height>0 && width<=MaxImageDimension && height<=MaxImageDimension &&
+        (long)width*height<=MaxImagePixels && format is FormatPng or FormatJpeg;
     public static Packet Control(MessageType type,string session,int device,long sequence) => new(type,session,device,sequence,0,0,0,0,0,[]);
     public static byte[] Encode(Packet p) {
         Validate(p.Type,p.Payload.Length,p.DeviceId,p.Sequence,p.CapturedUtcMs,p.Width,p.Height,p.Rotation,p.Format);
@@ -51,8 +55,8 @@ public static class FrameProtocol {
         if(type<MessageType.Hello || type>MessageType.Ack || length<0 || length>MaxPayload || device<=0 || sequence<0 || captured<0)
             throw new InvalidDataException("Invalid frame fields");
         if(type==MessageType.Frame) {
-            if(length==0 || sequence==0 || w!=640 || h!=480 || rotation!=0 || format!=1)
-                throw new InvalidDataException("Expected 640x480 PNG, rotation 0");
+            if(length==0 || sequence==0 || !IsSupportedImage(w,h,format) || rotation!=0)
+                throw new InvalidDataException("Expected supported PNG/JPEG image dimensions, rotation 0");
         } else if(length!=0 || w!=0 || h!=0 || rotation!=0 || format!=0 || (type==MessageType.Hello && sequence!=0))
             throw new InvalidDataException("Invalid control packet");
     }

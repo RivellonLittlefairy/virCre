@@ -41,6 +41,7 @@ public class Options {
     private Rect crop;
     private boolean control = true;
     private int displayId;
+    private String vircreCamera;
     private String cameraId;
     private Size cameraSize;
     private CameraFacing cameraFacing;
@@ -161,6 +162,10 @@ public class Options {
 
     public int getDisplayId() {
         return displayId;
+    }
+
+    public String getVircreCamera() {
+        return vircreCamera;
     }
 
     public String getCameraId() {
@@ -424,6 +429,12 @@ public class Options {
                     break;
                 case "display_id":
                     options.displayId = Integer.parseInt(value);
+                    break;
+                case "vircre_camera":
+                    if (!value.matches("[1-9][0-9]*:[a-f0-9]{32}")) {
+                        throw new IllegalArgumentException("Invalid virtual camera configuration");
+                    }
+                    options.vircreCamera = value;
                     break;
                 case "show_touches":
                     options.showTouches = Boolean.parseBoolean(value);

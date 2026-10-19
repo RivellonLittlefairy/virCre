@@ -1,4 +1,5 @@
 using Microsoft.UI.Windowing;
+using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VirCre.Presentation;
@@ -16,6 +17,11 @@ public sealed partial class MainWindow : Window {
     private readonly ShutdownCoordinator windowShutdown=new();
 
     public MainWindow() {
+        windowHost=new(stage=>RuntimeDiagnostics.Write("input-rejected",details:stage),message=>{
+            RuntimeDiagnostics.Write("virtual-camera",details:message);
+            DispatcherQueue.TryEnqueue(()=>ShowAction(message));
+        },stage=>RuntimeDiagnostics.Write("camera-stage",details:stage));
+        appWindows=new(windowHost);
         var settings = LoadSettings();
         RuntimeDiagnostics.Write("startup",details:DataDirectory);
         model = new(settings: settings.Settings);
@@ -28,6 +34,10 @@ public sealed partial class MainWindow : Window {
         AppGrid.ItemsSource = model.Apps;
         RunningList.ItemsSource = model.Running;
         ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
+        VirtualCameraToggle.IsOn=model.VirtualCameraEnabled;
+        CameraFrameRateBox.Value=model.CameraFrameRate;
+        var appVersion=typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]??"0.1";
+        AboutVersion.Text="virCre "+appVersion;
         Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
         model.SettingsChanged += SaveSettings;
         phone.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
@@ -166,6 +176,7 @@ public sealed partial class MainWindow : Window {
         DevicePicker.IsEnabled=!cleanupOnly && !scanning;
         RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
         AppGrid.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading && model.HasDevice;ThemeChoice.IsEnabled=!cleanupOnly;
+        VirtualCameraToggle.IsEnabled=!cleanupOnly;CameraFrameRateBox.IsEnabled=!cleanupOnly;
         foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
         if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;
