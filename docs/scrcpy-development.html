@@ -1,0 +1,14 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>内置 scrcpy 本地构建</title><style>body{max-width:960px;margin:32px auto;padding:0 24px;font:16px/1.8 system-ui}pre{background:#8882;padding:14px;overflow:auto}code{overflow-wrap:anywhere}</style><body>
+<h1>内置 scrcpy 本地构建</h1><p>日期：2026-10-19。原始源码为 third_party/scrcpy，版本 5.0.1。普通用户只需完整发布包，不需要安装 GCC、MSYS2 或系统 scrcpy。</p>
+<h2>开发环境</h2><p>本机将官方便携 MSYS2 base 放在 <code>.cache/toolchains/msys64</code>。下载来源及官方 GitHub asset SHA-256 保存在 <code>.cache/toolchains/msys2-source.json</code>。默认目录可由 Build-Scrcpy 的 <code>-ToolchainDirectory</code> 参数替换；不得把整套工具链放进发布包。</p>
+<p>在该便携环境的 UCRT64 shell 内安装编译工具。下载包使用 MSYS2 keyring 验证签名：</p><pre>pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf
+pacman -Sdd --needed mingw-w64-ucrt-x86_64-sdl3 mingw-w64-ucrt-x86_64-ffmpeg mingw-w64-ucrt-x86_64-libusb</pre>
+<p>第二步有意只取得开发头文件及导入库，不运行该包内的 FFmpeg，也不分发它的 GPL DLL。客户端及测试链接后使用经过官方发行包哈希验证的运行 DLL；若未来所需符号与官方 DLL 不兼容，必须明确升级整套依赖和许可证，而不能依赖开发机 PATH 补齐。</p>
+<p>当前工具：GCC 16.2.0、Meson 1.12.1、Ninja 1.13.2；开发头文件为 SDL 3.4.18、FFmpeg 9.0.2、libusb 1.0.30。Android SDK API 36、Build Tools 和 Android Studio JBR 用于编译 server。</p>
+<h2>构建与测试</h2><pre>pwsh -NoProfile -File tools/Build-Scrcpy.ps1
+pwsh -NoProfile -File tools/Test-CustomScrcpy.ps1</pre>
+<p>默认 debug 构建运行上游全部 12 个 C 测试。编译目录为 <code>.cache/scrcpy-build/debug</code>；自定义客户端、配套 server 及 DLL 输出至 <code>.cache/custom-runtime/scrcpy</code>。原版缓存 <code>.cache/bundled-runtime/scrcpy</code> 保持独立。</p>
+<p>脚本自动修补本机未能创建的 GCC/LD/LTO 文件别名，使用普通文件副本，不要求管理员创建链接。临时文件写入项目缓存；脚本退出时恢复进程环境，不修改系统环境变量。</p>
+<p>server 按 AIDL、javac、D8 顺序从源码生成，最低 API 为 36；客户端与 server 都使用 5.0.1 进行协议版本核对。runtime-manifest.json 的 distribution 为 <code>vircre-source-build</code>，包含整个源码目录的内容指纹及每个发布文件的 SHA-256。后续输入法代码变动后必须重新构建。</p>
+<p>独立运行验证会清空编译工具与用户工具的 PATH，仅保留 Windows System32，再执行客户端版本查询。这样可以发现开发机有 DLL、发布目录却没有的遗漏。</p>
+<p><a href="windows-ime-plan.html">输入法实施计划</a> · <a href="windows-ime-design.html">输入法设计</a></p></body></html>

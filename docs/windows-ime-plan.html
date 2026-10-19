@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 中文输入实施计划</title><style>body{max-width:1000px;margin:32px auto;padding:0 24px;font:16px/1.8 system-ui}code{background:#8882}section{border-top:1px solid #8885;margin-top:24px}li{margin:8px 0}</style></head><body>
+<h1>Windows 中文输入实施计划</h1>
+<p>目标：在独立应用窗口内使用电脑输入法组词、选词并提交 Unicode，保持普通英文、编辑键和复制粘贴可用。规范：<a href="windows-ime-design.html">已讨论的输入法设计</a>。按 writing-plans 编写，使用 executing-plans 在现有 <code>codex/bundled-scrcpy-ime</code> 分支逐项执行；每项先验证失败、实现、验证通过并记录提交。</p>
+<p>架构：基于 scrcpy 5.0.1 的 SDL3 输入事件，增加显式 <code>--windows-ime</code> 模式。可打印键通过文本确认事件传输，组词期间的编辑键不进入手机。新增独立控制消息，在 Android 端按手机串行设置剪贴板并同步派发 PASTE；不借用旧异步剪贴板 ACK 代表完成。</p>
+<p>技术栈：本地便携 MSYS2/UCRT64、GCC、Meson/Ninja；Android API 36、JDK、D8；现有 WinUI 3/.NET 8。</p>
+<section><h2>全局约束</h2><ul>
+<li>不安装或切换手机输入法，不使用独立文本面板，不使用全局键盘钩子；不修改机器全局 PATH、代理或安全设置。</li>
+<li>不记录输入文字、拼音、剪贴板内容或按键序列。测试只记录匹配是否成功。</li>
+<li>保留原版模式用于对照。自定义产物与 official-unmodified 分开缓存并记录来源及文件哈希，不让准备脚本覆盖自定义构建。</li>
+<li>手机剪贴板会包含已提交文字；禁止粘贴的应用可能不兼容。Windows 剪贴板不能因 IME 提交被自动同步覆盖。</li>
+<li>候选框先使用 Windows 原生界面；当前没有 Android 文本光标矩形，不承诺精确跟随光标。真实组词验证通过前不启用新默认行为。</li>
+</ul></section>
+<section><h2>任务 1：本地构建与独立运行时</h2><p>创建 <code>tools/Build-Scrcpy.ps1</code>，消费已导入源码和便携工具链，生成本地客户端与 server 至独立缓存。先编译未修改输入行为的源码，运行上游 C 测试和版本检查。开发头文件/导入库用于编译，尽量复用经过验证的官方运行 DLL，避免带入不必要的依赖。</p><ol><li>在无本地构建产物时运行版本/产物检查，记录失败。</li><li>建立 GCC/Meson/Ninja 构建，按 API 36 的 AIDL、javac、D8 顺序构建 server，版本保持配套。</li><li>清空子进程 PATH 后执行客户端 <code>--version</code>；记录工具版本、源码和文件 SHA-256。</li><li>提交工具和来源说明。</li></ol></section>
+<section><h2>任务 2：组词状态与 Windows 文本输入</h2><p>修改 <code>app/src/input_manager.*</code>、<code>keyboard_sdk.*</code>、<code>options.*</code>、<code>cli.c</code>、<code>screen.c</code>；新增独立 <code>ime_state.*</code> 与测试。接口：按键过滤接收 scancode、按下/松开、组词状态与快捷键修饰符；返回是否消费。文本事件为唯一可打印字符来源，防止首个字母在 TEXT_EDITING 前泄漏。</p><ol><li>先写并运行失败测试：开始/结束/取消组词、候选数字/空格/回车/退格、过滤配对 key-up、失焦、中英文切换、保留 Ctrl+C/V。</li><li>实现显式选项，仅接受 Windows SDK 键盘；选择文本注入模式，组词时消费编辑键，失焦清理组词状态。</li><li>确认原生候选和组词 UI 开启；定位使用窗口内稳定区域，不猜测手机光标坐标。</li><li>运行新增测试和上游完整 C 测试，再提交。</li></ol></section>
+<section><h2>任务 3：Unicode 提交、确认与隔离</h2><p>扩展 <code>app/src/control_msg.*</code>、<code>controller.*</code> 和 server 的控制消息读取/派发。新增 COMMIT_TEXT 控制消息，不改变原版 INJECT_TEXT 或 SET_CLIPBOARD 语义。Android 使用跨 server 进程锁覆盖设置剪贴板和 WAIT_FOR_FINISH 粘贴，超时或失败关闭本次控制路径，禁止静默重放。IME 专用剪贴板标记供所有自定义 server 的自动同步监听器识别，避免污染 Windows 剪贴板。</p><ol><li>先写失败测试：中文、emoji、UTF-8 边界、超长拒绝、连续提交顺序、两进程锁互斥/超时、提交失败及普通复制粘贴。</li><li>实现有长度和总字节限制的提交队列、专用消息、完成确认；日志只有状态。</li><li>用真实 server 与自有编辑框验证混输、多行、快速连续提交；随后验证两个窗口快速切换不会串入另一个应用。</li><li>通过后提交协议、server 和测试。</li></ol></section>
+<section><h2>任务 4：真实输入法与桌面集成</h2><p>修改运行时准备脚本、发布元数据及 <code>ScrcpyWindowHost</code>。原生组词验收完成之前，通过显式原型启动入口测试；通过后再默认加入 <code>--windows-ime</code>，保留原版对照方式。</p><ol><li>先写失败测试：自定义运行时不被官方准备覆盖、缺失配套 server 或 DLL 明确报错、独立开窗参数正确。</li><li>验证微软拼音真实候选选择，随后检查常用编辑框和搜索框。候选框出现与文字正确上屏分别记录。</li><li>验证断线/关闭不重放、取消组词、退格、中英文混输与既有快捷键。</li><li>运行桌面六组回归、运行时检查、全新目录发布和实际 WinUI 启动测试，做整项独立只读审查；更新 HTML 验证记录并提交。</li></ol></section>
+<section><h2>重点复核与完成条件</h2><ul><li>首字母事件早于组词事件：不能向手机多发拼音。</li><li>候选词确认后 key-up：不能漏掉一次 Enter/Space 或向手机发重复按键。</li><li>窗口失焦与断线：不能将旧提交交给新窗口/新设备。</li><li>同一手机多个 server：共享剪贴板更新必须与同步 PASTE 串行，不能互相覆盖。</li><li>原生输入法与禁止粘贴应用：分别标明实际支持范围，不用模拟事件冒充用户验收。</li></ul><p>只有真实 Windows 输入法的组词、选词、正确上屏和多窗口隔离都通过，才标记“自然中文输入完成”。构建和状态机通过仅标记对应阶段完成。</p></section>
+</body></html>
