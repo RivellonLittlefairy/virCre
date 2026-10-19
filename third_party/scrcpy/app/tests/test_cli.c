@@ -149,6 +149,22 @@ static void test_parse_shortcut_mods(void) {
     assert(!ok);
 }
 
+static void test_windows_ime(void) {
+#ifdef _WIN32
+    struct scrcpy_cli_args args = {.opts = scrcpy_options_default};
+    char *argv[] = {"scrcpy", "--windows-ime"};
+    assert(scrcpy_parse_args(&args, ARRAY_LEN(argv), argv));
+    assert(args.opts.key_inject_mode == SC_KEY_INJECT_MODE_TEXT);
+
+    args.opts = scrcpy_options_default;
+    char *hid[] = {"scrcpy", "--windows-ime", "--keyboard=uhid"};
+    assert(!scrcpy_parse_args(&args, ARRAY_LEN(hid), hid));
+    args.opts = scrcpy_options_default;
+    char *raw[] = {"scrcpy", "--raw-key-events", "--windows-ime"};
+    assert(!scrcpy_parse_args(&args, ARRAY_LEN(raw), raw));
+#endif
+}
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
@@ -158,5 +174,6 @@ int main(int argc, char *argv[]) {
     test_options();
     test_options2();
     test_parse_shortcut_mods();
+    test_windows_ime();
     return 0;
 }

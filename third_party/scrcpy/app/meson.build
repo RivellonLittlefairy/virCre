@@ -23,6 +23,7 @@ src = [
     'src/hwdec.c',
     'src/icon.c',
     'src/input_manager.c',
+    'src/ime_state.c',
     'src/keyboard_sdk.c',
     'src/mouse_capture.c',
     'src/mouse_sdk.c',
@@ -86,6 +87,7 @@ if host_machine.system() == 'windows'
         'src/util/command.c',
         'src/sys/win/file.c',
         'src/sys/win/process.c',
+        'src/sys/win/ime.c',
         windows.compile_resources('scrcpy-windows.rc'),
     ]
     feature_test_macros += [
@@ -177,6 +179,7 @@ endif
 if host_machine.system() == 'windows'
     dependencies += cc.find_library('mingw32')
     dependencies += cc.find_library('ws2_32')
+    dependencies += cc.find_library('comctl32')
 endif
 
 check_functions = [
@@ -269,6 +272,7 @@ endif
 # do not build tests in release (assertions would not be executed at all)
 if get_option('buildtype') == 'debug'
     tests = [
+        ['test_ime_state', ['tests/test_ime_state.c', 'src/ime_state.c']],
         ['test_adb_parser', [
             'tests/test_adb_parser.c',
             'src/adb/adb_device.c',

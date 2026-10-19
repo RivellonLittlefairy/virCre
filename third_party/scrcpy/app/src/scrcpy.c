@@ -503,6 +503,9 @@ scrcpy(struct scrcpy_options *options) {
     // Set hints before starting the server thread to avoid race conditions in
     // SDL
     sc_sdl_set_hints(options->render_driver, options->disable_screensaver);
+    if (options->windows_ime) {
+        SDL_SetHint(SDL_HINT_IME_IMPLEMENTED_UI, "none");
+    }
 
     if (!sc_server_start(&s->server)) {
         goto end;
@@ -824,6 +827,7 @@ aoa_complete:
             .gp = gp,
             .mouse_bindings = options->mouse_bindings,
             .legacy_paste = options->legacy_paste,
+            .windows_ime = options->windows_ime,
             .clipboard_autosync = options->clipboard_autosync,
             .shortcut_mods = options->shortcut_mods,
             .window_title = window_title,

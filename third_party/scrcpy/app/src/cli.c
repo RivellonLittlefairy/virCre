@@ -26,6 +26,7 @@ enum {
     OPT_CROP,
     OPT_RECORD_FORMAT,
     OPT_PREFER_TEXT,
+    OPT_WINDOWS_IME,
     OPT_WINDOW_X,
     OPT_WINDOW_Y,
     OPT_WINDOW_WIDTH,
@@ -768,6 +769,13 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_POWER_OFF_ON_CLOSE,
         .longopt = "power-off-on-close",
         .text = "Turn the device screen off when closing scrcpy.",
+    },
+    {
+        .longopt_id = OPT_WINDOWS_IME,
+        .longopt = "windows-ime",
+        .text = "Use the Windows IME in SDK keyboard mode (virCre experimental).\n"
+                "Committed Unicode text uses the paired virCre server.\n"
+                "Applications that prohibit paste may not accept text.",
     },
     {
         .longopt_id = OPT_PREFER_TEXT,
@@ -2721,6 +2729,9 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
                 }
                 opts->key_inject_mode = SC_KEY_INJECT_MODE_TEXT;
                 break;
+            case OPT_WINDOWS_IME:
+                opts->windows_ime = true;
+                break;
             case OPT_RAW_KEY_EVENTS:
                 if (opts->key_inject_mode != SC_KEY_INJECT_MODE_MIXED) {
                     LOGE("--prefer-text is incompatible with --raw-key-events");
@@ -3257,6 +3268,21 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             LOGE("Cannot not disable all inputs in OTG mode.");
             return false;
         }
+    }
+
+    if (opts->windows_ime) {
+#ifndef _WIN32
+        LOGE("--windows-ime requires Windows");
+        return false;
+#endif
+        if (opts->keyboard_input_mode != SC_KEYBOARD_INPUT_MODE_SDK ||
+                opts->key_inject_mode == SC_KEY_INJECT_MODE_RAW ||
+                !opts->control || !opts->video_playback) {
+            LOGE("--windows-ime requires a controlled SDK keyboard window without raw key events");
+            return false;
+        }
+        // No printable raw key is sent, even before the first composition notification.
+        opts->key_inject_mode = SC_KEY_INJECT_MODE_TEXT;
     }
 
     if (opts->keyboard_input_mode != SC_KEYBOARD_INPUT_MODE_SDK) {

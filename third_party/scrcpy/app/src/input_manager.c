@@ -29,6 +29,8 @@ sc_input_manager_init(struct sc_input_manager *im,
     im->mp = params->mp;
     im->gp = params->gp;
     im->camera = params->camera;
+    im->windows_ime = params->windows_ime;
+    sc_ime_state_init(&im->ime);
 
     im->mouse_bindings = params->mouse_bindings;
     im->legacy_paste = params->legacy_paste;
@@ -428,6 +430,11 @@ sc_input_manager_process_key(struct sc_input_manager *im,
     bool ctrl = mod & SDL_KMOD_CTRL;
     bool shift = mod & SDL_KMOD_SHIFT;
     bool repeat = event->repeat;
+
+    if (im->windows_ime && sc_ime_state_filter_key(&im->ime, event->scancode,
+            down, repeat, mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI))) {
+        return;
+    }
 
     // Either the modifier includes a shortcut modifier, or the key
     // press/release is a modifier key.
@@ -1167,6 +1174,19 @@ void
 sc_input_manager_handle_event(struct sc_input_manager *im,
                               const SDL_Event *event) {
     switch (event->type) {
+        case SC_EVENT_IME_STATE:
+            if (im->windows_ime) {
+                sc_ime_state_set_composing(&im->ime, event->user.code != 0);
+            }
+            break;
+        case SDL_EVENT_TEXT_EDITING:
+            if (im->windows_ime) {
+                sc_ime_state_set_composing(&im->ime, event->edit.text && event->edit.text[0]);
+            }
+            break;
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+            sc_ime_state_set_composing(&im->ime, false);
+            break;
         case SDL_EVENT_TEXT_INPUT:
             sc_input_manager_process_text_input(im, &event->text);
             break;

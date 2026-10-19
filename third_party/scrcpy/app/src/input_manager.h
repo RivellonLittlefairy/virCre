@@ -11,6 +11,7 @@
 #include "controller.h"
 #include "file_pusher.h"
 #include "options.h"
+#include "ime_state.h"
 #include "trait/gamepad_processor.h"
 #include "trait/key_processor.h"
 #include "trait/mouse_processor.h"
@@ -48,6 +49,8 @@ struct sc_input_manager {
     uint64_t next_sequence; // used for request acknowledgements
 
     bool disconnected;
+    bool windows_ime;
+    struct sc_ime_state ime;
 };
 
 struct sc_input_manager_params {
@@ -58,6 +61,8 @@ struct sc_input_manager_params {
     struct sc_mouse_processor *mp;
     struct sc_gamepad_processor *gp;
     bool camera;
+
+    bool windows_ime;
 
     struct sc_mouse_bindings mouse_bindings;
     bool legacy_paste;

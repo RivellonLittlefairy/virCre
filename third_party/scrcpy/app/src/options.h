@@ -332,6 +332,7 @@ struct scrcpy_options {
     bool audio_playback;
     bool turn_screen_off;
     enum sc_key_inject_mode key_inject_mode;
+    bool windows_ime;
     bool window_aspect_ratio_lock;
     bool window_borderless;
     bool mipmaps;

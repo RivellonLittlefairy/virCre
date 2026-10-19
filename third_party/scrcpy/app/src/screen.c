@@ -1,4 +1,7 @@
 #include "screen.h"
+#ifdef _WIN32
+#include "sys/win/ime.h"
+#endif
 
 #include <assert.h>
 #include <string.h>
@@ -702,10 +705,17 @@ sc_screen_init(struct sc_screen *screen,
         .mouse_bindings = params->mouse_bindings,
         .legacy_paste = params->legacy_paste,
         .clipboard_autosync = params->clipboard_autosync,
+        .windows_ime = params->windows_ime,
         .shortcut_mods = params->shortcut_mods,
     };
 
     sc_input_manager_init(&screen->im, &im_params);
+#ifdef _WIN32
+    if (params->windows_ime && !sc_windows_ime_init(screen->window)) {
+        av_frame_free(&screen->frame);
+        goto error_destroy_texture;
+    }
+#endif
 
     // Initialize even if not used for simplicity
     sc_mouse_capture_init(&screen->mc, screen->window, params->shortcut_mods);
@@ -850,6 +860,9 @@ sc_screen_destroy(struct sc_screen *screen) {
     SDL_GL_DestroyContext(screen->gl_context);
 #endif
     SDL_DestroyRenderer(screen->renderer);
+#ifdef _WIN32
+    sc_windows_ime_destroy(screen->window);
+#endif
     SDL_DestroyWindow(screen->window);
     sc_fps_counter_destroy(&screen->fps_counter);
     sc_frame_buffer_destroy(&screen->fb);
