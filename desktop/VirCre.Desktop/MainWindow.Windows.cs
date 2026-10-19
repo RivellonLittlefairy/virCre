@@ -32,7 +32,7 @@ public sealed partial class MainWindow {
         if ((sender as FrameworkElement)?.Tag is AppCard card) await OpenCardAsync(card);
     }
     private async Task OpenCardAsync(AppCard card) {
-        if (closing) return;
+        if (closing || windowShutdown.HasStarted) return;
         if (scanning || model.IsLoading || !model.HasDevice || DevicePicker.SelectedItem is not PhoneDevice { State: DeviceState.Online } device ||
             card.SourceSerial != device.Serial || model.CurrentSerial != device.Serial || !model.Apps.Any(app => app.PackageName == card.PackageName)) {
             ShowAction("设备或应用列表已经变化，请刷新后重新选择。", true);return;

@@ -16,15 +16,16 @@ public sealed partial class MainWindow {
 
     private async void RefreshDevices_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
     private async void DevicePicker_SelectionChanged(object sender, SelectionChangedEventArgs e) {
-        if (!ready || syncingDevices || closing) return;
+        if (!ready || syncingDevices || closing || windowShutdown.HasStarted) return;
         await catalogController.SelectAsync(DevicePicker.SelectedItem as PhoneDevice, lifetime.Token);
     }
     private Task RefreshDevicesAsync() {
+        if(windowShutdown.HasStarted)return Task.CompletedTask;
         refreshTask = RefreshDevicesCoreAsync();
         return refreshTask;
     }
     private async Task RefreshDevicesCoreAsync() {
-        if (closing) return;
+        if (closing || windowShutdown.HasStarted) return;
         var generation = ++scanGeneration;
         deviceScan?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
@@ -33,10 +34,10 @@ public sealed partial class MainWindow {
         scanning = true;
         DevicePicker.IsEnabled = false;
         RefreshDevices.IsEnabled = false;
-        await catalogController.SelectAsync(null, request.Token);
         try {
+            await catalogController.SelectAsync(null, request.Token);
             var devices = await phone.GetDevicesAsync(request.Token);
-            if (closing || generation != scanGeneration || request.IsCancellationRequested) return;
+            if (closing || windowShutdown.HasStarted || generation != scanGeneration || request.IsCancellationRequested) return;
             var selected = devices.FirstOrDefault(device => device.Serial == previous);
             if (selected == null && devices.Count == 1) selected = devices[0];
             syncingDevices = true;
@@ -47,8 +48,8 @@ public sealed partial class MainWindow {
             RefreshDevices.IsEnabled = true;
             await catalogController.SelectAsync(selected, request.Token);
         } catch (OperationCanceledException) { }
-        catch (Exception error) when (error is IOException or TimeoutException or ArgumentException) {
-            if (!closing && generation == scanGeneration) {
+        catch (Exception error) when (CatalogErrors.IsExpected(error)) {
+            if (!closing && !windowShutdown.HasStarted && generation == scanGeneration) {
                 syncingDevices = true;
                 try { DevicePicker.SelectedItem = null; DevicePicker.ItemsSource = null; }
                 finally { syncingDevices = false; }
@@ -56,12 +57,22 @@ public sealed partial class MainWindow {
             }
         } finally {
             if (ReferenceEquals(deviceScan, request)) deviceScan = null;
-            if (!closing && generation == scanGeneration) {
+            if (!closing && !windowShutdown.HasStarted && generation == scanGeneration) {
                 scanning = false;
                 DevicePicker.IsEnabled = true;
                 RefreshDevices.IsEnabled = true;
                 RenderState();
             }
         }
+    }
+    internal bool TryRecoverCatalogFormatError(Exception error) {
+        if(error is not InvalidDataException || !ready || closing || windowShutdown.HasStarted)return false;
+        ++scanGeneration;deviceScan?.Cancel();scanning=false;
+        var reset=catalogController.SelectAsync(null,lifetime.Token);
+        if(!reset.IsCompleted)return false;
+        reset.GetAwaiter().GetResult();
+        model.ReportDeviceError(error.Message);
+        ShowAction("设备数据格式异常，请刷新设备后重试。",true);
+        RenderState();return true;
     }
 }

@@ -16,6 +16,7 @@ public sealed partial class MainWindow {
         return settingsStore.Load();
     }
     private void SaveSettings() {
+        if(windowShutdown.HasStarted)return;
         var snapshot=model.ExportSettings();
         settingsTask=SaveAfterAsync(settingsTask,snapshot);
     }

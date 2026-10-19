@@ -31,7 +31,7 @@ public sealed class CatalogController(IPhoneCatalog phone, ShellViewModel model)
             }
         } catch (OperationCanceledException) {
             if (!disposed && ticket == generation) model.FailLoad("应用读取已取消，请刷新重试。");
-        } catch (Exception error) when (error is IOException or TimeoutException or ArgumentException) {
+        } catch (Exception error) when (CatalogErrors.IsExpected(error)) {
             if (!disposed && ticket == generation) model.FailLoad(error.Message);
         } finally {
             if (ReferenceEquals(active, request)) active = null;

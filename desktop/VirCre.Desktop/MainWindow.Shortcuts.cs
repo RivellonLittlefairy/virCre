@@ -9,12 +9,16 @@ public sealed partial class MainWindow {
     private Task shortcutTask=Task.CompletedTask;
     private readonly List<Task> shortcutWrites=[];
     public void ActivateShortcut(string? payload) {
+        if(windowShutdown.HasStarted) {
+            if(!closing) {Activate();ShowAction("正在结束会话，请先关闭剩余应用窗口。",true);}
+            return;
+        }
         Activate();
         if(payload!=null) shortcutTask=OpenShortcutAfterAsync(shortcutTask,payload);
     }
     private async Task OpenShortcutAfterAsync(Task previous, string payload) {
         await previous;
-        if(closing) return;
+        if(closing || windowShutdown.HasStarted) return;
         try {
             var request=ShortcutRequest.Decode(payload);
             ShowAction($"正在连接 {request.DeviceName}，打开 {request.Name}…");
@@ -37,7 +41,7 @@ public sealed partial class MainWindow {
     }
     private static async Task ObserveWriteAsync(Task work) {try {await work;} catch(Exception) { /* UI action reports the error; shutdown only waits for completion. */ }}
     private async Task<ShortcutCreation> CreateShortcutCoreAsync(AppCard card,string directory,bool desktop) {
-        if(closing || scanning || model.IsLoading || DevicePicker.SelectedItem is not PhoneDevice {State:DeviceState.Online} device ||
+        if(closing || windowShutdown.HasStarted || scanning || model.IsLoading || DevicePicker.SelectedItem is not PhoneDevice {State:DeviceState.Online} device ||
             card.SourceSerial!=device.Serial || model.CurrentSerial!=device.Serial || !model.Apps.Any(a=>a.PackageName==card.PackageName)) throw new IOException("设备或应用已变化，请重新选择。");
         var hardware=device.HardwareId.Length>0?device.HardwareId:await ShortcutRequest.GetHardwareIdAsync(new CommandRunner(),device.Serial,lifetime.Token);
         if(hardware.Length==0) throw new IOException("无法读取手机稳定标识，暂不能创建自动连接快捷方式。请检查 ADB 授权后重试。");

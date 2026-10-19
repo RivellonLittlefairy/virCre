@@ -75,6 +75,22 @@ source.Pending["cancelled"].SetCanceled();
 await cancelledLoad;
 Require(!real.IsLoading && real.Apps.Count == 0, "Cancelled listing got stuck loading");
 Console.WriteLine("PASS: cancelled listing ends loading without partial data");
+foreach(var malformed in new[]{"missing app list header","List of apps:\n - Broken ???","List of apps:\n * Valid com.valid.app\n - Broken ???"}) {
+    var malformedLoad=controller.SelectAsync(new("malformed","Malformed",VirCre.Launcher.DeviceState.Online));
+    try {VirCre.Launcher.PhoneCatalog.ParseApps(malformed);throw new Exception("Malformed catalog was accepted");}
+    catch(InvalidDataException error) {source.Pending["malformed"].SetException(error);}
+    await malformedLoad;
+    Require(!real.IsLoading && real.Apps.Count==0 && !string.IsNullOrEmpty(real.ErrorMessage),"A format failure escaped or published a partial app list");
+    source.Pending.Remove("malformed");
+}
+var recoveryLoad=controller.SelectAsync(new("recovered","Recovered",VirCre.Launcher.DeviceState.Online));
+source.Pending["recovered"].SetResult([new("Recovered app","com.recovered.app",false)]);
+await recoveryLoad;
+Require(real.Apps.Single().PackageName=="com.recovered.app" && real.ErrorMessage.Length==0,"Format failure prevented a later refresh");
+Require(VirCre.Launcher.CatalogErrors.IsExpected(new InvalidDataException()) && !VirCre.Launcher.CatalogErrors.IsExpected(new InvalidOperationException()),"Device and app read boundaries must handle invalid data without hiding programmer errors");
+try {VirCre.Launcher.PhoneCatalog.ParseDevices("unexpected adb output");throw new Exception("Malformed device list was accepted");}
+catch(InvalidDataException error) {Require(VirCre.Launcher.CatalogErrors.IsExpected(error),"Device parser errors must be accepted by the shared UI error filter");}
+Console.WriteLine("PASS: real parser failures are shown as recoverable errors and a later refresh succeeds");
 
 var saved = new ShellViewModel(settings: new(["com.real.app","com.absent.app"],"Dark"));
 using(var persistedController=new CatalogController(new ImmediateCatalog(),saved)) {
@@ -106,7 +122,9 @@ windowsModel.Navigate("running");
 Require(!windowsModel.IsEmpty && windowsModel.Running.Count==1,"Running windows must be shown even without the original device selected");
 windowsModel.UpdateWindows([]);
 Require(windowsModel.IsEmpty,"Closing last window must restore running empty state");
-Console.WriteLine("PASS: running windows remain independent of selected device and update empty state");static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
+Console.WriteLine("PASS: running windows remain independent of selected device and update empty state");
+await ShutdownChecks.RunAsync();
+static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();

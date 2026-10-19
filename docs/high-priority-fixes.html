@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>virCre 高优问题修复记录 · 2026-10-19</title>
+  <style>
+    :root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; line-height: 1.75; }
+    body { max-width: 920px; margin: 40px auto; padding: 0 24px 48px; }
+    h1, h2 { line-height: 1.35; }
+    h2 { margin-top: 32px; }
+    code { background: #8882; border-radius: 4px; padding: 2px 5px; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #8886; padding: 10px 12px; text-align: left; vertical-align: top; }
+    .note { border-left: 4px solid #4e8ed2; background: #4e8ed212; padding: 12px 16px; }
+  </style>
+</head>
+<body>
+  <h1>virCre 高优问题修复记录</h1>
+  <p>日期：2026-10-19。审查基线：<code>dcb80b374624bc55e489b9176d28de3bb37edf54</code>。</p>
+  <p>本次处理审查报告中的两个 High：DESK-01 和 DESK-02。原始审查报告保持原样；中低优问题和电脑中文输入法功能未在本次修改。</p>
+
+  <h2>DESK-01：目录格式异常造成意外退出</h2>
+  <p><code>InvalidDataException</code> 不继承 <code>IOException</code>，原有过滤器遗漏了它。现由 <code>CatalogErrors.IsExpected</code> 统一分类，应用目录控制器和设备刷新入口都使用该过滤器。格式异常显示为可重试错误，不发布部分应用列表。</p>
+  <p>在 <code>App.UnhandledException</code> 增加诊断和有限恢复：仅当异常属于 <code>InvalidDataException</code>、窗口处于可恢复状态且目录状态已成功重置时，才标记为已处理。未知异常继续保持未处理，避免掩盖程序错误。</p>
+  <ul>
+    <li>覆盖缺少应用列表头、错误条目、有效条目后跟错误条目，以及设备列表头缺失。</li>
+    <li>真实解析器产生的异常进入控制器后，界面模型结束加载、清空目录并保留错误；后续正常刷新可恢复。</li>
+    <li>验证公共过滤器接受格式异常，但不接受 <code>InvalidOperationException</code>。</li>
+  </ul>
+
+  <h2>DESK-02：关闭失败后无法交互与重复退出失败</h2>
+  <p>新增 <code>ShutdownCoordinator</code>，将后台任务收尾与应用窗口清理分开。取消读取、等待设置及快捷方式写入只执行一次；各项异常分别记录，不跳过其他清理任务。每次退出重试都会再次尝试关闭剩余窗口。</p>
+  <p>后台历史任务的 fault 不再单独阻止退出。只要仍有归属窗口，就保留主进程和窗口管理能力，不放弃对仍存活子进程的所有权。并发退出请求共享同一次清理。</p>
+  <div class="note">关闭失败后恢复 Root 和导航交互，进入“运行中”页面，并显示失败提示。由于读取生命周期已取消，界面进入收尾状态：可以切回、关闭剩余窗口和再次退出；刷新设备、启动应用、收藏、主题修改及新增快捷方式不再接受新工作。</div>
+  <ul>
+    <li>历史读取 fault 可记录，但无剩余窗口时仍允许退出。</li>
+    <li>窗口清理失败后恢复交互；重试不重复启动后台收尾。</li>
+    <li>窗口已结束时仍等待未完成写入；同步异常不跳过其他任务。</li>
+    <li>即使清理任务报告成功，只要仍拥有窗口，仍不能退出。</li>
+    <li>使用真实 <code>AppWindowManager</code> 配合可失败的测试进程，验证保留 CloseFailed 窗口、Focus、拒绝新启动、手动关闭后再次退出。</li>
+  </ul>
+
+  <h2>验证结果</h2>
+  <p>新增回归在修复前的异常过滤或旧关闭语义下出现失败，修复后通过。以下命令均完成且退出码为 0：</p>
+  <table>
+    <thead><tr><th>检查</th><th>命令或范围</th></tr></thead>
+    <tbody>
+      <tr><td>目录与退出回归</td><td><code>dotnet run --project desktop/VirCre.Presentation.Tests</code></td></tr>
+      <tr><td>启动器</td><td><code>dotnet run --project desktop/VirCre.Launcher.Tests</code></td></tr>
+      <tr><td>独立窗口生命周期</td><td><code>dotnet run --project desktop/VirCre.WindowTests</code></td></tr>
+      <tr><td>设置、图标、快捷方式功能</td><td><code>dotnet run --project desktop/VirCre.FeatureTests</code></td></tr>
+      <tr><td>Windows Shell 快捷方式</td><td><code>dotnet run --project desktop/VirCre.DesktopTests</code></td></tr>
+      <tr><td>摄像头协议</td><td><code>dotnet run --project desktop/VirCam.Tests</code></td></tr>
+      <tr><td>PowerShell 工具</td><td><code>pwsh -NoProfile -File tools/Test-Tools.ps1</code></td></tr>
+      <tr><td>内置运行时</td><td><code>pwsh -NoProfile -File tools/Test-ScrcpyRuntime.ps1</code></td></tr>
+      <tr><td>Windows 发布构建</td><td><code>pwsh -NoProfile -File tools/Publish-Desktop.ps1</code></td></tr>
+    </tbody>
+  </table>
+  <p>发布包已更新至 <code>out/desktop-release/VirCre.Desktop.exe</code>；发布目录内的运行时文件已逐个核对 SHA-256，与其 <code>runtime-manifest.json</code> 一致。</p>
+  <p>独立只读审查未发现这两个 High 修复中新引入或仍未解决的实质缺陷。</p>
+  <h2>验证边界与手动验收</h2>
+  <p>模型测试和窗口管理集成测试不能替代真实 WinUI 故障交互。本轮未在 GUI 中注入设备格式异常或子进程关闭失败，也未进行真机复验。</p>
+  <ol>
+    <li>让目录读取返回缺少列表头或错误条目，确认程序保持运行、显示错误且刷新后可恢复。</li>
+    <li>在受控环境模拟应用窗口关闭失败，确认自动进入“运行中”、错误提示可见，并可切回和重试关闭剩余窗口。</li>
+    <li>确认收尾状态不能刷新或打开新应用；剩余窗口结束后，标题栏关闭可以正常退出。</li>
+  </ol>
+</body>
+</html>

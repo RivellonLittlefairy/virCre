@@ -7,7 +7,13 @@ namespace VirCre.Desktop;
 public partial class App : Application {
     private MainWindow? window;
     private AppInstance? instance;
-    public App() { InitializeComponent(); }
+    public App() { InitializeComponent();UnhandledException+=App_UnhandledException; }
+    private void App_UnhandledException(object sender,Microsoft.UI.Xaml.UnhandledExceptionEventArgs args) {
+        RuntimeDiagnostics.Write("unhandled-exception",args.Exception);
+        try {if(window?.TryRecoverCatalogFormatError(args.Exception)==true)args.Handled=true;}
+        catch(Exception recoveryError) {RuntimeDiagnostics.Write("unhandled-recovery-failed",recoveryError);}
+        // Unknown exceptions remain unhandled: continuing after arbitrary UI corruption is unsafe.
+    }
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args) {
         instance=AppInstance.FindOrRegisterForKey("virCre.Desktop.launcher");
         if(!instance.IsCurrent) {

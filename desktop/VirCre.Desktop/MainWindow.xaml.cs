@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window {
     private XamlRoot? observedRoot;
     private double minimumScale;
     private bool allowClose;
+    private readonly ShutdownCoordinator windowShutdown=new();
 
     public MainWindow() {
         var settings = LoadSettings();
@@ -57,16 +58,36 @@ public sealed partial class MainWindow : Window {
         Root.IsHitTestVisible = false;
         Navigation.IsEnabled = false;
         FooterStatus.Text = "正在关闭应用窗口并停止设备读取…";
-        lifetime.Cancel();
-        try { await Task.WhenAll(catalogController.StopAsync(), refreshTask, appWindows.StopAsync(), settingsTask, shortcutTask, nativeDragTask, Task.WhenAll(shortcutWrites.ToArray())); }
+        try {
+            var result=await windowShutdown.TryStopAsync([
+                new("lifetime",()=>{lifetime.Cancel();return Task.CompletedTask;}),
+                new("catalog",catalogController.StopAsync),new("refresh",()=>refreshTask),
+                new("settings",()=>settingsTask),new("shortcut-activation",()=>shortcutTask),
+                new("native-drag",()=>nativeDragTask),new("shortcut-writes",()=>Task.WhenAll(shortcutWrites.ToArray()))],
+                appWindows.StopAsync,()=>appWindows.Windows.Count>0,
+                enabled=>{Root.IsHitTestVisible=enabled;Navigation.IsEnabled=enabled;});
+            foreach(var failure in result.Failures)RuntimeDiagnostics.Write("shutdown-work-failed",failure.Error,failure.Name);
+            if(!result.CanClose) {
+                RestoreCleanupControls("仍有应用窗口未关闭，请在运行中页面重试关闭窗口，再关闭主界面。");
+                return;
+            }
+        }
         catch (Exception error) {
             // Keep ownership and allow another title-bar close attempt instead of abandoning a live process.
-            closing = false;
-            FooterStatus.Text = "关闭尚未完成：" + error.Message + " 请关闭剩余应用窗口后，再次关闭主界面。";
+            RuntimeDiagnostics.Write("shutdown-failed",error);
+            RestoreCleanupControls(error.Message);
             return;
         }
         allowClose = true;
         Close();
+    }
+    private void RestoreCleanupControls(string message) {
+        closing=false;Root.IsHitTestVisible=true;Navigation.IsEnabled=true;
+        model.UpdateWindows(appWindows.Windows);
+        Navigation.SelectedItem=Navigation.MenuItems.OfType<NavigationViewItem>().First(item=>Equals(item.Tag,"running"));
+        model.Navigate("running");
+        RenderState();
+        ShowAction("关闭尚未完成："+message,true);
     }
 
     private async void Root_Loaded(object sender, RoutedEventArgs e) {
@@ -99,6 +120,7 @@ public sealed partial class MainWindow : Window {
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args) {
         if (!ready) return;
         var page = args.IsSettingsSelected ? "settings" : (args.SelectedItem as NavigationViewItem)?.Tag as string;
+        if(windowShutdown.HasStarted && page!="running")return;
         if (page != null) model.Navigate(page);
         SearchBox.Text = model.Query;
     }
@@ -106,6 +128,7 @@ public sealed partial class MainWindow : Window {
         if (ready && args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) model.Search(sender.Text);
     }
     private void Favorite_Click(object sender, RoutedEventArgs e) {
+        if(windowShutdown.HasStarted)return;
         if ((sender as Button)?.Tag is string packageName) model.ToggleFavorite(packageName);
     }
     private void AppGrid_SizeChanged(object sender, SizeChangedEventArgs e) {
@@ -117,7 +140,7 @@ public sealed partial class MainWindow : Window {
         }
     }
     private void Theme_SelectionChanged(object sender, SelectionChangedEventArgs e) {
-        if (!ready) return;
+        if (!ready || windowShutdown.HasStarted) return;
         Root.RequestedTheme = ThemeChoice.SelectedIndex switch { 1 => ElementTheme.Light, 2 => ElementTheme.Dark, _ => ElementTheme.Default };
         model.SetTheme(ThemeChoice.SelectedIndex switch {1=>"Light",2=>"Dark",_=>"System"});
     }
@@ -130,15 +153,21 @@ public sealed partial class MainWindow : Window {
     }
     private void RenderState() {
         if (!ready || closing) return;
+        var cleanupOnly=windowShutdown.HasStarted;
         PageTitle.Text = model.Title;
         PageDescription.Text = model.Description;
         AppCount.Text = model.ResultCount;
         DeviceName.Text = model.DeviceLabel;
-        DeviceHint.Text = scanning ? "正在检查设备…" : model.DeviceStatus;
-        ConnectionStatus.Text = model.DeviceStatus;
-        FooterStatus.Text = model.FooterText;
-        LoadingRing.IsActive = model.IsLoading || scanning;
-        SearchBox.IsEnabled = !model.IsLoading && model.HasDevice;
+        DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" : model.DeviceStatus;
+        ConnectionStatus.Text = cleanupOnly?"等待退出":model.DeviceStatus;
+        FooterStatus.Text = cleanupOnly?"数据读取已停止，可管理剩余应用窗口后重试关闭。":model.FooterText;
+        LoadingRing.IsActive = cleanupOnly?windowShutdown.IsStopping:model.IsLoading || scanning;
+        SearchBox.IsEnabled = !cleanupOnly && !model.IsLoading && model.HasDevice;
+        DevicePicker.IsEnabled=!cleanupOnly && !scanning;
+        RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
+        AppGrid.IsEnabled=!cleanupOnly;ThemeChoice.IsEnabled=!cleanupOnly;
+        foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
+        if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;
         EmptyDescription.Text = scanning ? "正在检查已授权的 ADB 设备。" : model.EmptyDescription;
         if (SearchBox.Text != model.Query) SearchBox.Text = model.Query;
