@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>virCre 启动失败修复 · 2026-10-19</title>
+  <style>
+    :root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; line-height: 1.75; }
+    body { max-width: 880px; padding: 24px; margin: auto; }
+    code { background: #8882; padding: 2px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+    h1, h2 { line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>桌面端启动失败修复</h1>
+  <p>日期：2026-10-19。问题来自发布包遗漏界面资源，没有证据表明与用户此前终止进程有关。</p>
+  <h2>故障证据</h2>
+  <p>启动日志显示：主窗口 <code>InitializeComponent</code> 抛出 <code>Microsoft.UI.Xaml.Markup.XamlParseException</code>，HRESULT 为 <code>0x802B000A</code>。程序随即退出，Windows 事件日志记录异常代码 <code>0xc000027b</code>。</p>
+  <p>构建目录中存在 <code>VirCre.Desktop.pri</code>，发布目录却没有。PRI 保存应用的 XAML 资源索引；已有的 <code>Microsoft.UI*.pri</code> 属于框架，不能替代应用自己的资源。仅补入应用 PRI 后，同一发布目录的程序便能创建主窗口并响应。</p>
+  <h2>修复</h2>
+  <ul>
+    <li>在桌面项目的 MSBuild 发布目标中，将生成的 <code>ProjectPriFullPath</code> 加入 <code>ResolvedFileToPublish</code>。资源未生成时明确报错。</li>
+    <li>新增 <code>tools/Test-DesktopPublish.ps1</code>，检查应用 PRI、程序及必要运行时文件。正式发布脚本在报告成功前执行此检查。</li>
+    <li>提供可选 <code>-SmokeTest</code>：实际启动发布程序，等待主窗口、确认响应，然后正常关闭。已有 virCre 进程时拒绝测试，防止单实例转发让旧程序冒充新包通过。</li>
+  </ul>
+  <h2>回归验证</h2>
+  <ol>
+    <li>修复前向全新目录发布：构建成功，但新增检查失败，明确报告缺少 <code>VirCre.Desktop.pri</code>。</li>
+    <li>修复后向另一全新目录发布：无需手动复制资源，发布检查通过。</li>
+    <li>对新包执行 <code>Test-DesktopPublish.ps1 -SmokeTest</code>：真实 WinUI 主窗口启动并响应，随后正常退出。</li>
+  </ol>
+  <p>这次启动测试补足了此前“编译和控制台测试通过，但没有实际启动发布界面”的验证缺口。它只验证启动与正常关闭，不等同于设备读取、快捷方式拖拽或异常关闭恢复的完整 GUI 验收。</p>
+  <h2>启动</h2>
+  <p>运行完整发布文件夹中的 <code>out/desktop-release/VirCre.Desktop.exe</code>。复制或移动时保留整个发布文件夹；单独复制 EXE 会缺少依赖或界面资源。</p>
+</body>
+</html>

@@ -19,6 +19,13 @@
     <ProjectReference Include="../VirCre.Presentation/VirCre.Presentation.csproj" />
     <Content Include="../../android-agent/build/icon-agent.jar" Link="Assets/icon-agent.jar" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="PublishXamlResourceIndex" BeforeTargets="ComputeFilesToPublish" DependsOnTargets="_GenerateProjectPriFile">
+    <!-- Unpackaged dotnet publish does not automatically include the generated application PRI. -->
+    <Error Condition="!Exists('$(ProjectPriFullPath)')" Text="The generated XAML resource index is missing: $(ProjectPriFullPath)" />
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" RelativePath="$(ProjectPriFileName)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
   <Target Name="BuildIconAgent" BeforeTargets="PrepareForBuild">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-IconAgent.ps1&quot;" />
   </Target>

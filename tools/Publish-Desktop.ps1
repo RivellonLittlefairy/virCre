@@ -5,6 +5,7 @@ $repo=Split-Path $PSScriptRoot -Parent
 if(-not $OutputDirectory) {$OutputDirectory=Join-Path $repo 'out\desktop-release'}
 & dotnet publish (Join-Path $repo 'desktop\VirCre.Desktop\VirCre.Desktop.csproj') -c Release -r win-x64 --self-contained true -o $OutputDirectory --nologo
 if($LASTEXITCODE -ne 0) {throw 'Desktop publish failed'}
+& (Join-Path $PSScriptRoot 'Test-DesktopPublish.ps1') -OutputDirectory $OutputDirectory
 $publishedDocs=Join-Path $OutputDirectory 'docs'
 New-Item -ItemType Directory -Force -Path $publishedDocs | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repo 'docs') | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $publishedDocs -Recurse -Force}
