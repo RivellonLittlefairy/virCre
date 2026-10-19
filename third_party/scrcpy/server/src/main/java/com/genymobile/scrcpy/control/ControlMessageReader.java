@@ -8,6 +8,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
 
 public class ControlMessageReader {
 
@@ -29,6 +31,8 @@ public class ControlMessageReader {
                 return parseInjectKeycode();
             case ControlMessage.TYPE_INJECT_TEXT:
                 return parseInjectText();
+            case ControlMessage.TYPE_COMMIT_TEXT:
+                return parseCommitText();
             case ControlMessage.TYPE_INJECT_TOUCH_EVENT:
                 return parseInjectTouchEvent();
             case ControlMessage.TYPE_INJECT_SCROLL_EVENT:
@@ -106,6 +110,19 @@ public class ControlMessageReader {
     private ControlMessage parseInjectText() throws IOException {
         String text = parseString();
         return ControlMessage.createInjectText(text);
+    }
+
+    private ControlMessage parseCommitText() throws IOException {
+        long sequence = dis.readLong();
+        int length = dis.readInt();
+        if (sequence <= 0 || length <= 0 || length > 65536) {
+            throw new ControlProtocolException("Invalid IME commit header");
+        }
+        byte[] raw = new byte[length];
+        dis.readFully(raw);
+        String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(raw)).toString();
+        return ControlMessage.createCommitText(sequence, text);
     }
 
     private ControlMessage parseInjectTouchEvent() throws IOException {

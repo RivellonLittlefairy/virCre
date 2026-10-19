@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stdlib.h>
 
 #include <assert.h>
 #include <stdint.h>
@@ -537,6 +538,26 @@ static void test_serialize_scan_file(void) {
     assert(!memcmp(buf, expected, sizeof(expected)));
 }
 
+static void test_serialize_commit_text(void) {
+    struct sc_control_msg msg = {
+        .type = SC_CONTROL_MSG_TYPE_COMMIT_TEXT,
+        .commit_text = {.sequence = 42, .text = "\xE4\xBD\xA0\xE5\xA5\xBD\xF0\x9F\x98\x80"},
+    };
+    uint8_t buf[SC_CONTROL_MSG_MAX_SIZE];
+    const uint8_t expected[] = {23, 0,0,0,0,0,0,0,42, 0,0,0,10,
+        0xE4,0xBD,0xA0,0xE5,0xA5,0xBD,0xF0,0x9F,0x98,0x80};
+    assert(sc_control_msg_serialize(&msg, buf) == sizeof(expected));
+    assert(!memcmp(buf, expected, sizeof(expected)));
+    char *long_text = malloc(SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH + 2);
+    memset(long_text, 'a', SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH + 1);
+    long_text[SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH + 1] = '\0';
+    msg.commit_text.text = long_text;
+    assert(sc_control_msg_serialize(&msg, buf) == 0); // Never silently truncate committed text.
+    long_text[SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH] = '\0';
+    assert(sc_control_msg_serialize(&msg, buf) == 13 + SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH);
+    free(long_text);
+}
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
@@ -566,5 +587,6 @@ int main(int argc, char *argv[]) {
     test_serialize_camera_zoom_out();
     test_serialize_resize_display();
     test_serialize_scan_file();
+    test_serialize_commit_text();
     return 0;
 }

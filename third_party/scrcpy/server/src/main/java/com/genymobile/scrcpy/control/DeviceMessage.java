@@ -5,6 +5,8 @@ public final class DeviceMessage {
     public static final int TYPE_CLIPBOARD = 0;
     public static final int TYPE_ACK_CLIPBOARD = 1;
     public static final int TYPE_UHID_OUTPUT = 2;
+    public static final int TYPE_ACK_TEXT = 3;
+    public static final int TYPE_REJECT_TEXT = 4;
 
     private int type;
     private String text;
@@ -25,6 +27,20 @@ public final class DeviceMessage {
     public static DeviceMessage createAckClipboard(long sequence) {
         DeviceMessage event = new DeviceMessage();
         event.type = TYPE_ACK_CLIPBOARD;
+        event.sequence = sequence;
+        return event;
+    }
+
+    public static DeviceMessage createAckText(long sequence) {
+        DeviceMessage event = new DeviceMessage();
+        event.type = TYPE_ACK_TEXT;
+        event.sequence = sequence;
+        return event;
+    }
+
+    public static DeviceMessage createRejectText(long sequence) {
+        DeviceMessage event = new DeviceMessage();
+        event.type = TYPE_REJECT_TEXT;
         event.sequence = sequence;
         return event;
     }

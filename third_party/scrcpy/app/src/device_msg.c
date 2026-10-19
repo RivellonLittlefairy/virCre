@@ -38,6 +38,8 @@ sc_device_msg_deserialize(const uint8_t *buf, size_t len,
             msg->clipboard.text = text;
             return 5 + clipboard_len;
         }
+        case DEVICE_MSG_TYPE_REJECT_TEXT:
+        case DEVICE_MSG_TYPE_ACK_TEXT:
         case DEVICE_MSG_TYPE_ACK_CLIPBOARD: {
             if (len < 9) {
                 return 0; // no complete message

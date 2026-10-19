@@ -4,8 +4,10 @@ import com.genymobile.scrcpy.FakeContext;
 
 import android.content.ClipData;
 import android.content.Context;
+import android.os.PersistableBundle;
 
 public final class ClipboardManager {
+    private static final String IME_LABEL = "virCre.ime.private";
     private final android.content.ClipboardManager manager;
 
     static ClipboardManager create() {
@@ -29,6 +31,23 @@ public final class ClipboardManager {
             return null;
         }
         return clipData.getItemAt(0).getText();
+    }
+
+    public CharSequence getTextForSync() {
+        ClipData clipData = manager.getPrimaryClip();
+        if (clipData == null || clipData.getItemCount() == 0 || IME_LABEL.contentEquals(
+                clipData.getDescription().getLabel() == null ? "" : clipData.getDescription().getLabel())) {
+            return null;
+        }
+        return clipData.getItemAt(0).getText();
+    }
+
+    public void setImeText(String text) {
+        ClipData clipData = ClipData.newPlainText(IME_LABEL, text);
+        PersistableBundle extras = new PersistableBundle();
+        extras.putBoolean("android.content.extra.IS_SENSITIVE", true);
+        clipData.getDescription().setExtras(extras);
+        manager.setPrimaryClip(clipData);
     }
 
     public boolean setText(CharSequence text) {

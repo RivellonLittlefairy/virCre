@@ -19,12 +19,14 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWin
     }
     public IAppWindowProcess Start(AppLaunchRequest request) {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("独立窗口需要 Windows。");
-        var start=(tools??new BundledTools()).CreateStartInfo("scrcpy");
+        var bundledTools=tools??new BundledTools();
+        var start=bundledTools.CreateStartInfo("scrcpy");
         start.UseShellExecute=false;start.CreateNoWindow=true;
         start.RedirectStandardOutput=true;start.RedirectStandardError=true;
         start.StandardOutputEncoding=Encoding.UTF8;start.StandardErrorEncoding=Encoding.UTF8;
         var process=new Process {StartInfo=start};
         foreach(var argument in Arguments(request))process.StartInfo.ArgumentList.Add(argument);
+        if(bundledTools.SupportsWindowsIme)process.StartInfo.ArgumentList.Add("--windows-ime");
         try {process.Start();return new ScrcpyProcess(process);}
         catch(System.ComponentModel.Win32Exception) {process.Dispose();throw new IOException("无法启动内置 scrcpy，请检查完整发布目录中的手机连接组件。");}
     }

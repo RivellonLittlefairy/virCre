@@ -6,6 +6,11 @@ $manifestPath=Join-Path $repoDirectory 'third_party\scrcpy-runtime.json'
 $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if(-not $DestinationDirectory) {$DestinationDirectory=Join-Path $repoDirectory '.cache\bundled-runtime\scrcpy'}
 $DestinationDirectory=[IO.Path]::GetFullPath($DestinationDirectory)
+$existingManifest=Join-Path $DestinationDirectory 'runtime-manifest.json'
+if(Test-Path -LiteralPath $existingManifest) {
+    $existing=Get-Content -LiteralPath $existingManifest -Raw | ConvertFrom-Json
+    if($existing.distribution -ne 'official-unmodified') {throw 'Refusing to overwrite a custom scrcpy runtime with the official distribution'}
+}
 if(-not $ArchivePath) {
     $downloadDirectory=Join-Path $repoDirectory '.cache\scrcpy-runtime'
     New-Item -ItemType Directory -Force -Path $downloadDirectory | Out-Null

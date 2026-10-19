@@ -1,10 +1,26 @@
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace VirCre.Launcher;
 
 /// <summary>Uses the release's own client, server and ADB. Never selects another version from PATH.</summary>
 public sealed class BundledTools(string? applicationDirectory=null) {
     public string DirectoryPath {get;}=Path.Combine(Path.GetFullPath(applicationDirectory??AppContext.BaseDirectory),"runtime","scrcpy");
+    public bool SupportsWindowsIme {
+        get {
+            var manifest=Path.Combine(DirectoryPath,"runtime-manifest.json");
+            if(!File.Exists(manifest))return false;
+            try {
+                using var json=JsonDocument.Parse(File.ReadAllText(manifest));
+                var root=json.RootElement;
+                return root.TryGetProperty("distribution",out var distribution) && distribution.GetString()=="vircre-source-build"
+                    && root.TryGetProperty("features",out var features) && features.ValueKind==JsonValueKind.Array
+                    && features.EnumerateArray().Any(item=>item.ValueKind==JsonValueKind.String && item.GetString()=="windows-ime-v1");
+            } catch(Exception error) when(error is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException) {
+                throw new IOException("内置组件信息读取失败，请重新解压完整的 virCre 发布目录。",error);
+            }
+        }
+    }
     public ProcessStartInfo CreateStartInfo(string file) {
         if(file is not ("adb" or "scrcpy")) return new(file);
         var executable=Path.Combine(DirectoryPath,file+".exe");

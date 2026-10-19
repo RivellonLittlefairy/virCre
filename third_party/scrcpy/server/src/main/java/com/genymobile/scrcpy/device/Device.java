@@ -135,6 +135,12 @@ public final class Device {
         return clipboardManager.setText(text);
     }
 
+    public static String getClipboardTextForSync() {
+        ClipboardManager manager = ServiceManager.getClipboardManager();
+        CharSequence text = manager == null ? null : manager.getTextForSync();
+        return text == null ? null : text.toString();
+    }
+
     public static boolean setDisplayPower(int displayId, boolean on) {
         assert displayId != Device.DISPLAY_ID_NONE;
 

@@ -1,6 +1,7 @@
 #include "controller.h"
 
 #include <assert.h>
+#include <string.h>
 
 #include "util/log.h"
 
@@ -13,6 +14,7 @@ sc_controller_receiver_on_ended(struct sc_receiver *receiver, bool error,
     (void) receiver;
 
     struct sc_controller *controller = userdata;
+    sc_controller_stop(controller);
     // Forward the event to the controller listener
     controller->cbs->on_ended(controller, error, controller->cbs_userdata);
 }
@@ -56,6 +58,16 @@ sc_controller_init(struct sc_controller *controller, sc_socket control_socket,
         return false;
     }
 
+    if (!sc_acksync_init(&controller->ime_ack)) {
+        sc_cond_destroy(&controller->msg_cond);
+        sc_receiver_destroy(&controller->receiver);
+        sc_mutex_destroy(&controller->mutex);
+        sc_vecdeque_destroy(&controller->queue);
+        return false;
+    }
+    controller->receiver.ime_ack = &controller->ime_ack;
+    controller->queued_ime_bytes = 0;
+    controller->redact_input = false;
     controller->control_socket = control_socket;
     controller->stopped = false;
 
@@ -79,6 +91,7 @@ sc_controller_configure(struct sc_controller *controller,
 
 void
 sc_controller_destroy(struct sc_controller *controller) {
+    sc_acksync_destroy(&controller->ime_ack);
     sc_cond_destroy(&controller->msg_cond);
     sc_mutex_destroy(&controller->mutex);
 
@@ -100,7 +113,18 @@ sc_controller_push_msg(struct sc_controller *controller,
 
     bool pushed = false;
 
+    size_t ime_bytes = msg->type == SC_CONTROL_MSG_TYPE_COMMIT_TEXT
+                     ? strlen(msg->commit_text.text) : 0;
+    if (msg->type == SC_CONTROL_MSG_TYPE_COMMIT_TEXT &&
+            (!ime_bytes || ime_bytes > SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH)) {
+        return false;
+    }
+
     sc_mutex_lock(&controller->mutex);
+    if (controller->stopped || ime_bytes > 1024 * 1024 - controller->queued_ime_bytes) {
+        sc_mutex_unlock(&controller->mutex);
+        return false;
+    }
     size_t size = sc_vecdeque_size(&controller->queue);
     if (size < SC_CONTROL_MSG_QUEUE_LIMIT) {
         bool was_empty = sc_vecdeque_is_empty(&controller->queue);
@@ -120,6 +144,9 @@ sc_controller_push_msg(struct sc_controller *controller,
     }
     // Otherwise, the msg is discarded
 
+    if (pushed) {
+        controller->queued_ime_bytes += ime_bytes;
+    }
     sc_mutex_unlock(&controller->mutex);
 
     return pushed;
@@ -154,6 +181,16 @@ process_msg(struct sc_controller *controller,
     if ((size_t) w != length) {
         *eos = true;
         return false;
+    }
+
+    if (msg->type == SC_CONTROL_MSG_TYPE_COMMIT_TEXT) {
+        enum sc_acksync_wait_result result = sc_acksync_wait(&controller->ime_ack,
+            msg->commit_text.sequence, sc_tick_now() + SC_TICK_FROM_SEC(12));
+        if (result != SC_ACKSYNC_WAIT_OK) {
+            LOGE("IME commit acknowledgement failed; no automatic replay");
+            *eos = result == SC_ACKSYNC_WAIT_INTR;
+            return false;
+        }
     }
 
     return true;
@@ -192,10 +229,13 @@ run_controller(void *data) {
             controller->resize_display.height = 0;
         } else {
             msg = sc_vecdeque_pop(&controller->queue);
+            if (msg.type == SC_CONTROL_MSG_TYPE_COMMIT_TEXT) {
+                controller->queued_ime_bytes -= strlen(msg.commit_text.text);
+            }
         }
         sc_mutex_unlock(&controller->mutex);
 
-        if (sc_get_log_level() <= SC_LOG_LEVEL_VERBOSE) {
+        if (!controller->redact_input && sc_get_log_level() <= SC_LOG_LEVEL_VERBOSE) {
             sc_control_msg_log(&msg);
         }
 
@@ -211,6 +251,7 @@ run_controller(void *data) {
         }
     }
 
+    sc_controller_stop(controller);
     controller->cbs->on_ended(controller, error, controller->cbs_userdata);
 
     return 0;
@@ -242,6 +283,7 @@ sc_controller_stop(struct sc_controller *controller) {
     controller->stopped = true;
     sc_cond_signal(&controller->msg_cond);
     sc_mutex_unlock(&controller->mutex);
+    sc_acksync_interrupt(&controller->ime_ack);
 }
 
 void

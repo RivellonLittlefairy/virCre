@@ -31,6 +31,8 @@ public class DeviceMessageWriter {
                 dos.write(raw, 0, len);
                 break;
             case DeviceMessage.TYPE_ACK_CLIPBOARD:
+            case DeviceMessage.TYPE_ACK_TEXT:
+            case DeviceMessage.TYPE_REJECT_TEXT:
                 dos.writeLong(msg.getSequence());
                 break;
             case DeviceMessage.TYPE_UHID_OUTPUT:

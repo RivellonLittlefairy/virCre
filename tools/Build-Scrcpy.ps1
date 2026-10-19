@@ -3,7 +3,8 @@ param(
     [string]$ToolchainDirectory,
     [string]$Sdk="$env:LOCALAPPDATA\Android\Sdk",
     [string]$Java='C:\Program Files\Android\Android Studio\jbr',
-    [ValidateSet('debug','release')][string]$BuildType='debug'
+    [ValidateSet('debug','release')][string]$BuildType='debug',
+    [switch]$SkipTests
 )
 $ErrorActionPreference='Stop'
 $repoDirectory=Split-Path $PSScriptRoot -Parent
@@ -43,11 +44,11 @@ try {
     if(Test-Path -LiteralPath (Join-Path $buildDirectory 'build.ninja')) {$setupArgs+='--reconfigure'}
     & $meson @setupArgs
     if($LASTEXITCODE -ne 0) {throw 'scrcpy Meson setup failed'}
-    & $meson compile -C $buildDirectory
+    & $meson compile -C $buildDirectory scrcpy
     if($LASTEXITCODE -ne 0) {throw 'scrcpy client build failed'}
     # Test against the same verified runtime DLLs that will ship, rather than the compiler environment's FFmpeg distribution.
     Get-ChildItem -LiteralPath $officialDirectory -Filter '*.dll' | Copy-Item -Destination (Join-Path $buildDirectory 'app') -Force
-    if($BuildType -eq 'debug') {
+    if($BuildType -eq 'debug' -and -not $SkipTests) {
         & $meson test -C $buildDirectory --print-errorlogs
         if($LASTEXITCODE -ne 0) {throw 'scrcpy client tests failed'}
     }
@@ -96,9 +97,9 @@ try {
     })
     $sourceFingerprint=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
     $officialRecord=Get-Content -LiteralPath (Join-Path $officialDirectory 'runtime-manifest.json') -Raw | ConvertFrom-Json
-    [ordered]@{version=$version;distribution='vircre-source-build';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
+    [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
 } finally {
     foreach($name in $previousEnvironment.Keys) {[Environment]::SetEnvironmentVariable($name,$previousEnvironment[$name])}
 }
-& (Join-Path $PSScriptRoot 'Test-CustomScrcpy.ps1') -RuntimeDirectory $runtimeDirectory
+if(-not $SkipTests) {& (Join-Path $PSScriptRoot 'Test-CustomScrcpy.ps1') -RuntimeDirectory $runtimeDirectory}
 Write-Output ('Custom scrcpy built: '+$runtimeDirectory)

@@ -110,6 +110,17 @@ sc_control_msg_serialize(const struct sc_control_msg *msg, uint8_t *buf) {
             sc_write32be(&buf[6], msg->inject_keycode.repeat);
             sc_write32be(&buf[10], msg->inject_keycode.metastate);
             return 14;
+        case SC_CONTROL_MSG_TYPE_COMMIT_TEXT: {
+            size_t len = strlen(msg->commit_text.text);
+            if (!len || len > SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH || !msg->commit_text.sequence) {
+                LOGE("IME commit rejected: invalid payload size or sequence");
+                return 0;
+            }
+            sc_write64be(&buf[1], msg->commit_text.sequence);
+            sc_write32be(&buf[9], len);
+            memcpy(&buf[13], msg->commit_text.text, len);
+            return 13 + len;
+        }
         case SC_CONTROL_MSG_TYPE_INJECT_TEXT: {
             size_t len = write_string(&buf[1], msg->inject_text.text,
                                       SC_CONTROL_MSG_INJECT_TEXT_MAX_LENGTH);
@@ -220,6 +231,9 @@ sc_control_msg_log(const struct sc_control_msg *msg) {
                      (int) msg->inject_keycode.keycode,
                      msg->inject_keycode.repeat,
                      (long) msg->inject_keycode.metastate);
+            break;
+        case SC_CONTROL_MSG_TYPE_COMMIT_TEXT:
+            LOG_CMSG("IME commit (content redacted)");
             break;
         case SC_CONTROL_MSG_TYPE_INJECT_TEXT:
             LOG_CMSG("text \"%s\"", msg->inject_text.text);
@@ -368,6 +382,9 @@ sc_control_msg_is_droppable(const struct sc_control_msg *msg) {
 void
 sc_control_msg_destroy(struct sc_control_msg *msg) {
     switch (msg->type) {
+        case SC_CONTROL_MSG_TYPE_COMMIT_TEXT:
+            free(msg->commit_text.text);
+            break;
         case SC_CONTROL_MSG_TYPE_INJECT_TEXT:
             free(msg->inject_text.text);
             break;

@@ -769,7 +769,7 @@ aoa_complete:
         if (options->keyboard_input_mode == SC_KEYBOARD_INPUT_MODE_SDK) {
             sc_keyboard_sdk_init(&s->keyboard_sdk, &s->controller,
                                  options->key_inject_mode,
-                                 options->forward_key_repeat);
+                                   options->forward_key_repeat, options->windows_ime);
             kp = &s->keyboard_sdk.key_processor;
         } else if (options->keyboard_input_mode
                 == SC_KEYBOARD_INPUT_MODE_UHID) {
@@ -805,6 +805,7 @@ aoa_complete:
         }
 
         sc_controller_configure(&s->controller, acksync, uhid_devices);
+        s->controller.redact_input = options->windows_ime;
 
         if (!sc_controller_start(&s->controller)) {
             goto end;

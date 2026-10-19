@@ -15,6 +15,8 @@ enum sc_device_msg_type {
     DEVICE_MSG_TYPE_CLIPBOARD,
     DEVICE_MSG_TYPE_ACK_CLIPBOARD,
     DEVICE_MSG_TYPE_UHID_OUTPUT,
+    DEVICE_MSG_TYPE_ACK_TEXT,
+    DEVICE_MSG_TYPE_REJECT_TEXT,
 };
 
 struct sc_device_msg {

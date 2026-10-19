@@ -18,6 +18,7 @@ struct sc_receiver {
     sc_mutex mutex;
 
     struct sc_acksync *acksync;
+    struct sc_acksync *ime_ack;
     struct sc_uhid_devices *uhid_devices;
 
     const struct sc_receiver_callbacks *cbs;

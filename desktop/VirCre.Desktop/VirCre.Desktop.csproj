@@ -12,6 +12,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
+    <ScrcpyRuntimeVariant Condition="'$(ScrcpyRuntimeVariant)' == ''">Official</ScrcpyRuntimeVariant>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
@@ -30,10 +31,16 @@
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-IconAgent.ps1&quot;" />
   </Target>
   <Target Name="PrepareBundledScrcpy" BeforeTargets="PrepareForBuild">
-    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Prepare-ScrcpyRuntime.ps1&quot;" />
+    <Error Condition="'$(ScrcpyRuntimeVariant)' != 'Official' and '$(ScrcpyRuntimeVariant)' != 'Custom'" Text="ScrcpyRuntimeVariant must be Official or Custom." />
+    <PropertyGroup>
+      <_ScrcpyRuntimeRoot Condition="'$(ScrcpyRuntimeVariant)' == 'Official'">$(MSBuildProjectDirectory)/../../.cache/bundled-runtime/scrcpy</_ScrcpyRuntimeRoot>
+      <_ScrcpyRuntimeRoot Condition="'$(ScrcpyRuntimeVariant)' == 'Custom'">$(MSBuildProjectDirectory)/../../.cache/custom-runtime/scrcpy</_ScrcpyRuntimeRoot>
+    </PropertyGroup>
+    <Exec Condition="'$(ScrcpyRuntimeVariant)' == 'Official'" Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Prepare-ScrcpyRuntime.ps1&quot;" />
+    <Exec Condition="'$(ScrcpyRuntimeVariant)' == 'Custom'" Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../tools/Prepare-CustomScrcpyRuntime.ps1&quot;" />
     <ItemGroup>
-      <_ScrcpyRuntime Include="$(MSBuildProjectDirectory)/../../.cache/bundled-runtime/scrcpy/**/*" />
-      <Content Include="@(_ScrcpyRuntime)" Link="runtime/scrcpy/%(_ScrcpyRuntime.RecursiveDir)%(_ScrcpyRuntime.Filename)%(_ScrcpyRuntime.Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <_ScrcpyRuntime Include="$(_ScrcpyRuntimeRoot)/**/*" />
+      <Content Include="@(_ScrcpyRuntime)" Link="runtime/scrcpy/%(_ScrcpyRuntime.RecursiveDir)%(_ScrcpyRuntime.Filename)%(_ScrcpyRuntime.Extension)" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
     </ItemGroup>
   </Target>
 </Project>

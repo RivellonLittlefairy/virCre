@@ -83,9 +83,20 @@ static void test_deserialize_uhid_output(void) {
     sc_device_msg_destroy(&msg);
 }
 
+static void test_ack_text(void) {
+    struct sc_device_msg msg;
+    const uint8_t ack[] = {3, 0,0,0,0,0,0,0,42};
+    for (unsigned len = 1; len < sizeof(ack); ++len) {
+        assert(sc_device_msg_deserialize(ack, len, &msg) == 0);
+    }
+    assert(sc_device_msg_deserialize(ack, sizeof(ack), &msg) == sizeof(ack));
+    assert(msg.ack_clipboard.sequence == 42); // ACK payloads share the same sequence layout.
+}
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
+    test_ack_text();
 
     test_deserialize_clipboard();
     test_deserialize_clipboard_big();

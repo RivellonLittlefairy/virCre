@@ -30,6 +30,7 @@ public final class ControlMessage {
     public static final int TYPE_CAMERA_ZOOM_OUT = 20;
     public static final int TYPE_RESIZE_DISPLAY = 21;
     public static final int TYPE_SCAN_FILE = 22;
+    public static final int TYPE_COMMIT_TEXT = 23;
 
     public static final long SEQUENCE_INVALID = 0;
 
@@ -77,6 +78,14 @@ public final class ControlMessage {
     public static ControlMessage createInjectText(String text) {
         ControlMessage msg = new ControlMessage();
         msg.type = TYPE_INJECT_TEXT;
+        msg.text = text;
+        return msg;
+    }
+
+    public static ControlMessage createCommitText(long sequence, String text) {
+        ControlMessage msg = new ControlMessage();
+        msg.type = TYPE_COMMIT_TEXT;
+        msg.sequence = sequence;
         msg.text = text;
         return msg;
     }

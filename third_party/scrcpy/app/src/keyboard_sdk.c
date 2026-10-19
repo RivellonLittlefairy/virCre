@@ -11,6 +11,7 @@
 #include "control_msg.h"
 #include "controller.h"
 #include "input_events.h"
+#include "events.h"
 #include "util/intmap.h"
 #include "util/log.h"
 
@@ -300,6 +301,24 @@ sc_key_processor_process_text(struct sc_key_processor *kp,
                               const struct sc_text_event *event) {
     struct sc_keyboard_sdk *kb = DOWNCAST(kp);
 
+    if (kb->windows_ime) {
+        size_t length = strlen(event->text);
+        if (!length) {return;}
+        if (length > SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH) {
+            LOGE("IME commit exceeds size limit");
+            sc_push_event(SC_EVENT_IME_COMMIT_REJECTED);
+            return;
+        }
+        struct sc_control_msg msg = {.type = SC_CONTROL_MSG_TYPE_COMMIT_TEXT,
+            .commit_text = {.sequence = kb->next_text_sequence++, .text = strdup(event->text)}};
+        if (!msg.commit_text.text || !sc_controller_push_msg(kb->controller, &msg)) {
+            free(msg.commit_text.text);
+            LOGE("IME commit queue unavailable; no automatic replay");
+            sc_push_event(SC_EVENT_IME_COMMIT_REJECTED);
+        }
+        return;
+    }
+
     if (kb->key_inject_mode == SC_KEY_INJECT_MODE_RAW) {
         // Never inject text events
         return;
@@ -331,10 +350,12 @@ void
 sc_keyboard_sdk_init(struct sc_keyboard_sdk *kb,
                      struct sc_controller *controller,
                      enum sc_key_inject_mode key_inject_mode,
-                     bool forward_key_repeat) {
+                     bool forward_key_repeat, bool windows_ime) {
     kb->controller = controller;
     kb->key_inject_mode = key_inject_mode;
     kb->forward_key_repeat = forward_key_repeat;
+    kb->windows_ime = windows_ime;
+    kb->next_text_sequence = 1;
 
     kb->repeat = 0;
 

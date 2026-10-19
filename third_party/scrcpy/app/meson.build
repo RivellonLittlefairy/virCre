@@ -1,5 +1,4 @@
 src = [
-    'src/main.c',
     'src/adb/adb.c',
     'src/adb/adb_device.c',
     'src/adb/adb_parser.c',
@@ -238,7 +237,7 @@ configure_file(configuration: conf, output: 'config.h')
 
 src_dir = include_directories('src')
 
-executable('scrcpy', src,
+executable('scrcpy', ['src/main.c'] + src,
            dependencies: dependencies,
            include_directories: src_dir,
            install: true,
@@ -344,6 +343,11 @@ if get_option('buildtype') == 'debug'
                          c_args: ['-DSC_TEST'])
         test(t[0], exe)
     endforeach
+    # Exercise the real controller lifecycle and queue without replacing its receiver/ownership logic.
+    controller_test_src = ['tests/test_ime_controller.c'] + src
+    controller_test = executable('test_ime_controller', controller_test_src,
+        include_directories: src_dir, dependencies: dependencies, c_args: ['-DSC_TEST'])
+    test('test_ime_controller', controller_test)
 endif
 
 if meson.version().version_compare('>= 0.58.0')

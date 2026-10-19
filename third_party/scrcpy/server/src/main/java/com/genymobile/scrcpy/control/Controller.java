@@ -34,6 +34,7 @@ import android.view.MotionEvent;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,6 +77,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
 
     // Interval between simulated user activity events
     private static final long KEEP_ACTIVE_INTERVAL_MS = 4000;
+    private static final File IME_CLIPBOARD_LOCK = new File("/data/local/tmp/vircre-ime-clipboard.lock");
 
     private static final ScheduledExecutorService EXECUTOR = Executors.newSingleThreadScheduledExecutor();
     private ExecutorService startAppExecutor;
@@ -151,7 +153,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                         // This is a notification for the change we are currently applying, ignore it
                         return;
                     }
-                    String text = Device.getClipboardText();
+                    String text = Device.getClipboardTextForSync();
                     if (text != null) {
                         DeviceMessage msg = DeviceMessage.createClipboard(text);
                         sender.send(msg);
@@ -351,6 +353,16 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                 case ControlMessage.TYPE_INJECT_TEXT:
                     if (supportsInputEvents) {
                         injectText(msg.getText());
+                    }
+                    return true;
+                case ControlMessage.TYPE_COMMIT_TEXT:
+                    try {
+                        commitText(msg.getText(), msg.getSequence());
+                    } catch (IOException | RuntimeException error) {
+                        // A missing editor/focus or denied paste must not destroy the video window.
+                        // Dispatch may be uncertain: never retry or log the submitted content.
+                        Ln.w("IME text dispatch was not confirmed; no automatic replay");
+                        sender.send(DeviceMessage.createRejectText(msg.getSequence()));
                     }
                     return true;
                 case ControlMessage.TYPE_INJECT_TOUCH_EVENT:
@@ -684,7 +696,11 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         return pressReleaseKeycode(KeyEvent.KEYCODE_POWER, Device.INJECT_MODE_ASYNC);
     }
 
-    private void getClipboard(int copyKey) {
+    private void getClipboard(int copyKey) throws IOException {
+        ImeCommitter.run(IME_CLIPBOARD_LOCK, 1000, () -> getClipboardLocked(copyKey));
+    }
+
+    private void getClipboardLocked(int copyKey) {
         // On Android >= 7, press the COPY or CUT key if requested
         if (copyKey != ControlMessage.COPY_KEY_NONE && Build.VERSION.SDK_INT >= AndroidVersions.API_24_ANDROID_7_0 && supportsInputEvents) {
             int key = copyKey == ControlMessage.COPY_KEY_COPY ? KeyEvent.KEYCODE_COPY : KeyEvent.KEYCODE_CUT;
@@ -696,7 +712,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         // particular when COPY or CUT are injected, so it should not be synchronized twice. On Android < 7, do not synchronize at all rather than
         // copying an old clipboard content.
         if (!clipboardAutosync) {
-            String clipboardText = Device.getClipboardText();
+            String clipboardText = Device.getClipboardTextForSync();
             if (clipboardText != null) {
                 DeviceMessage msg = DeviceMessage.createClipboard(clipboardText);
                 sender.send(msg);
@@ -704,7 +720,13 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         }
     }
 
-    private boolean setClipboard(String text, boolean paste, long sequence) {
+    private boolean setClipboard(String text, boolean paste, long sequence) throws IOException {
+        boolean[] result = {false};
+        ImeCommitter.run(IME_CLIPBOARD_LOCK, 1000, () -> result[0] = setClipboardLocked(text, paste, sequence));
+        return result[0];
+    }
+
+    private boolean setClipboardLocked(String text, boolean paste, long sequence) {
         isSettingClipboard.set(true);
         boolean ok = Device.setClipboardText(text);
         isSettingClipboard.set(false);
@@ -714,7 +736,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
 
         // On Android >= 7, also press the PASTE key if requested
         if (paste && Build.VERSION.SDK_INT >= AndroidVersions.API_24_ANDROID_7_0 && supportsInputEvents) {
-            pressReleaseKeycode(KeyEvent.KEYCODE_PASTE, Device.INJECT_MODE_ASYNC);
+            pressReleaseKeycode(KeyEvent.KEYCODE_PASTE, Device.INJECT_MODE_WAIT_FOR_FINISH);
         }
 
         if (sequence != ControlMessage.SEQUENCE_INVALID) {
@@ -724,6 +746,24 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         }
 
         return ok;
+    }
+
+    private void commitText(String text, long sequence) throws IOException {
+        if (!supportsInputEvents) {throw new IOException("IME input is unsupported on this display");}
+        ImeCommitter.run(IME_CLIPBOARD_LOCK, 1000, () -> {
+            if (Thread.currentThread().isInterrupted()) {throw new IOException("IME commit cancelled");}
+            ClipboardManager clipboard = ServiceManager.getClipboardManager();
+            if (clipboard == null) {throw new IOException("IME clipboard unavailable");}
+            isSettingClipboard.set(true);
+            try {
+                clipboard.setImeText(text);
+                if (!pressReleaseKeycode(KeyEvent.KEYCODE_PASTE, Device.INJECT_MODE_WAIT_FOR_FINISH)) {
+                    throw new IOException("IME paste dispatch failed");
+                }
+            } finally {isSettingClipboard.set(false);}
+        });
+        // Confirms the synchronous dispatch finished, not that every application accepted paste.
+        sender.send(DeviceMessage.createAckText(sequence));
     }
 
     private void openHardKeyboardSettings() {

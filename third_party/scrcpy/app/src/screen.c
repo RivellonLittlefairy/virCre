@@ -590,6 +590,7 @@ sc_screen_init(struct sc_screen *screen,
 
     const char *title = params->window_title;
     assert(title);
+    screen->window_title = title;
 
     int x = SDL_WINDOWPOS_UNDEFINED;
     int y = SDL_WINDOWPOS_UNDEFINED;
@@ -1209,6 +1210,15 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
             }
             return;
         }
+        case SC_EVENT_IME_COMMIT_REJECTED: {
+            char title[1024];
+            SDL_snprintf(title, sizeof(title), "%s | 输入未确认：请点击应用输入框后重新输入", screen->window_title);
+            SDL_SetWindowTitle(screen->window, title);
+            return;
+        }
+        case SC_EVENT_IME_COMMIT_ACCEPTED:
+            SDL_SetWindowTitle(screen->window, screen->window_title);
+            return;
         case SDL_EVENT_WINDOW_EXPOSED:
             sc_screen_render(screen, true);
             return;

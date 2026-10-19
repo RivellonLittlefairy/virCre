@@ -253,6 +253,13 @@ clipboard_paste(struct sc_input_manager *im) {
         return;
     }
 
+    if (im->windows_ime) {
+        const struct sc_text_event committed = {.text = text};
+        im->kp->ops->process_text(im->kp, &committed);
+        SDL_free(text);
+        return;
+    }
+
     char *text_dup = strdup(text);
     SDL_free(text);
     if (!text_dup) {
@@ -686,6 +693,14 @@ sc_input_manager_process_key(struct sc_input_manager *im,
 
     uint64_t ack_to_wait = SC_SEQUENCE_INVALID;
     bool is_ctrl_v = ctrl && !shift && sdl_keycode == SDLK_V && down && !repeat;
+    if (im->windows_ime && is_ctrl_v) {
+        // One atomic Unicode transaction; do not split clipboard update and Ctrl+V across servers.
+        if (event->scancode > SDL_SCANCODE_UNKNOWN && event->scancode < SDL_SCANCODE_COUNT) {
+            im->ime.blocked[event->scancode] = true;
+        }
+        clipboard_paste(im);
+        return;
+    }
     if (im->clipboard_autosync && is_ctrl_v) {
         if (im->legacy_paste) {
             // inject the text as input events

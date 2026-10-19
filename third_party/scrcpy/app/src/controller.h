@@ -20,6 +20,9 @@ struct sc_controller {
     sc_mutex mutex;
     sc_cond msg_cond;
     bool stopped;
+    bool redact_input;
+    size_t queued_ime_bytes;
+    struct sc_acksync ime_ack;
 
     struct sc_control_msg_queue queue;
 

@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Windows 中文输入实施计划</title><style>body{max-width:1000px;margin:32px auto;padding:0 24px;font:16px/1.8 system-ui}code{background:#8882}section{border-top:1px solid #8885;margin-top:24px}li{margin:8px 0}</style></head><body>
-<h1>Windows 中文输入实施计划</h1>
+<h1>Windows 中文输入实施计划</h1><p><strong>2026-10-19 用户调整：</strong>停止自动化及真机测试，移除本次新增的测试 App 页面，完成代码和预览包后由用户手动验证。以下测试步骤保留为原计划历史，不代表本轮执行。当前结果与手动步骤见 <a href="windows-ime-preview.html">预览版说明</a>。</p>
 <p>目标：在独立应用窗口内使用电脑输入法组词、选词并提交 Unicode，保持普通英文、编辑键和复制粘贴可用。规范：<a href="windows-ime-design.html">已讨论的输入法设计</a>。按 writing-plans 编写，使用 executing-plans 在现有 <code>codex/bundled-scrcpy-ime</code> 分支逐项执行；每项先验证失败、实现、验证通过并记录提交。</p>
 <p>架构：基于 scrcpy 5.0.1 的 SDL3 输入事件，增加显式 <code>--windows-ime</code> 模式。可打印键通过文本确认事件传输，组词期间的编辑键不进入手机。新增独立控制消息，在 Android 端按手机串行设置剪贴板并同步派发 PASTE；不借用旧异步剪贴板 ACK 代表完成。</p>
 <p>技术栈：本地便携 MSYS2/UCRT64、GCC、Meson/Ninja；Android API 36、JDK、D8；现有 WinUI 3/.NET 8。</p>

@@ -28,6 +28,7 @@ sc_receiver_init(struct sc_receiver *receiver, sc_socket control_socket,
 
     receiver->control_socket = control_socket;
     receiver->acksync = NULL;
+    receiver->ime_ack = NULL;
     receiver->uhid_devices = NULL;
 
     assert(cbs && cbs->on_ended);
@@ -81,6 +82,18 @@ task_uhid_output(void *userdata) {
 static void
 process_msg(struct sc_receiver *receiver, struct sc_device_msg *msg) {
     switch (msg->type) {
+        case DEVICE_MSG_TYPE_REJECT_TEXT:
+        case DEVICE_MSG_TYPE_ACK_TEXT:
+            if (msg->type == DEVICE_MSG_TYPE_REJECT_TEXT) {
+                LOGW("IME text was not confirmed; focus the application editor before entering new text. No automatic replay.");
+                sc_push_event(SC_EVENT_IME_COMMIT_REJECTED);
+            } else {
+                sc_push_event(SC_EVENT_IME_COMMIT_ACCEPTED);
+            }
+            if (receiver->ime_ack) {
+                sc_acksync_ack(receiver->ime_ack, msg->ack_clipboard.sequence);
+            }
+            break;
         case DEVICE_MSG_TYPE_CLIPBOARD: {
             // Take ownership of the text (do not destroy the msg)
             char *text = msg->clipboard.text;

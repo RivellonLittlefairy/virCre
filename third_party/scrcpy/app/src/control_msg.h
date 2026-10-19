@@ -19,6 +19,7 @@
 #define SC_CONTROL_MSG_CLIPBOARD_TEXT_MAX_LENGTH (SC_CONTROL_MSG_MAX_SIZE - 14)
 
 #define SC_CONTROL_MSG_SCAN_FILE_PATH_MAX_LENGTH 256
+#define SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH (64 * 1024)
 
 #define SC_POINTER_ID_MOUSE UINT64_C(-1)
 #define SC_POINTER_ID_GENERIC_FINGER UINT64_C(-2)
@@ -50,6 +51,7 @@ enum sc_control_msg_type {
     SC_CONTROL_MSG_TYPE_CAMERA_ZOOM_OUT,
     SC_CONTROL_MSG_TYPE_RESIZE_DISPLAY,
     SC_CONTROL_MSG_TYPE_SCAN_FILE,
+    SC_CONTROL_MSG_TYPE_COMMIT_TEXT,
 };
 
 enum sc_copy_key {
@@ -70,6 +72,10 @@ struct sc_control_msg {
         struct {
             char *text; // owned, to be freed by free()
         } inject_text;
+        struct {
+            uint64_t sequence;
+            char *text; // owned, to be freed by free()
+        } commit_text;
         struct {
             enum android_motionevent_action action;
             enum android_motionevent_buttons action_button;
