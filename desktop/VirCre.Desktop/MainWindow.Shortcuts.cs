@@ -43,7 +43,7 @@ public sealed partial class MainWindow {
         if(hardware.Length==0) throw new IOException("无法读取手机稳定标识，暂不能创建自动连接快捷方式。请检查 ADB 授权后重试。");
         var request=new ShortcutRequest(device.Serial,hardware,device.Model,card.PackageName,card.Name);
         lifetime.Token.ThrowIfCancellationRequested();
-        return await Task.Run(()=>desktop?ShortcutFiles.CreateWithFallback(request,card.IconPath,directory,Path.Combine(DataDirectory,"shortcuts")):
+        return await Task.Run(()=>desktop?ShortcutFiles.CreateWithFallback(request,card.IconPath,directory,Path.Combine(ShortcutDataDirectory,"shortcuts")):
             new ShortcutCreation(ShortcutFiles.Create(request,card.IconPath,directory),false));
     }
     private async void CreateShortcut_Click(object sender,RoutedEventArgs args) {

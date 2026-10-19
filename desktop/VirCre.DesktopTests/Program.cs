@@ -7,7 +7,7 @@ Directory.CreateDirectory(directory);
 try {
     var payload=new ShortcutRequest("phone.one","hardware","手机","com.app.test","设置 / 测试");
     var png=Path.Combine(directory,Guid.NewGuid().ToString("N")+".png");
-    File.WriteAllBytes(png,Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg=="));
+    File.WriteAllBytes(png,Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAzSURBVFhH7c4hAQAwCABBYhCOess5PAHAnHjz6iJf/ctiju0AAAAAAAAAAAAAAAAAAAAaLOtgeekXjY8AAAAASUVORK5CYII="));
     try {
         var path=ShortcutFiles.Create(payload,png,directory);
         var second=ShortcutFiles.Create(payload,png,directory);
@@ -32,11 +32,6 @@ try {
         Check(File.Exists(copied) && ShellLinkFile.Read(copied)==native,"Windows IFileOperation copies a valid shell link");
         var copiedAgain=NativeShell.CopyFile(path,Path.Combine(directory,"copied"));
         Check(copiedAgain!=copied && File.Exists(copied),"shell copying never overwrites an existing shortcut");
-        if(args.Contains("--desktop-probe")) {
-            var desktopCopy=NativeShell.CopyFile(path,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-            try {Check(File.Exists(desktopCopy),"actual apphost can place a shortcut on Desktop through IFileOperation");}
-            finally {File.Delete(desktopCopy);}
-        }
         var deniedDestination=Path.Combine(directory,"not-a-directory");File.WriteAllText(deniedDestination,"blocked destination");
         var staged=ShortcutFiles.CreateWithFallback(payload,png,deniedDestination,Path.Combine(directory,"staging"));
         Check(staged.Staged && File.Exists(staged.Path),"unwritable desktop still produces a usable shortcut in the app data directory");
@@ -49,11 +44,30 @@ try {
             Check(ActivationArguments.ParseCommandLine("\"C:\\Program Files\\virCre\\app.exe\" "+(string)shortcut.Arguments)==payload.Encode(),"redirected quoted executable preserves the payload");
             Check(File.Exists(((string)shortcut.IconLocation).Split(',')[0]),"shortcut icon persists outside drag staging");
         } finally {Marshal.FinalReleaseComObject(link);Marshal.FinalReleaseComObject(shell);}
+        var shellVisible=ShortcutFiles.Create(payload,png,Path.Combine(MainWindow.ShortcutDataDirectory,"links"));
+        object iconReader=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell",true)!)!;
+        object visibleLink=((dynamic)iconReader).CreateShortcut(shellVisible);
+        try {
+            string iconPath=((string)((dynamic)visibleLink).IconLocation).Split(',')[0];
+            var expected=ShellIconPixels.Read(iconPath);
+            Check(ShellIconPixels.Read(shellVisible).SequenceEqual(expected),"Windows Shell renders the app icon even when legacy portable storage has Low integrity");
+            Check(Path.GetDirectoryName(iconPath)==Path.Combine(MainWindow.ShortcutDataDirectory,"shortcut-icons"),"shell assets use their dedicated AppData directory independently of portable settings");
+            var visibleCopy=NativeShell.CopyFile(shellVisible,Path.Combine(MainWindow.ShortcutDataDirectory,"copies"));
+            Check(ShellIconPixels.Read(visibleCopy).SequenceEqual(expected),"shell copying preserves the visible app icon");
+            if(args.Contains("--desktop-probe")) {
+                var desktopCopy=NativeShell.CopyFile(shellVisible,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+                try {Check(ShellIconPixels.Read(desktopCopy).SequenceEqual(expected),"actual apphost places a shortcut with its app icon on Desktop through IFileOperation");}
+                finally {File.Delete(desktopCopy);}
+            }
+        } finally {Marshal.FinalReleaseComObject(visibleLink);Marshal.FinalReleaseComObject(iconReader);}
         Check(ActivationArguments.Parse(["--open"])=="invalid" && ActivationArguments.Parse(["--open","a","b"])=="invalid","extra or missing launch data rejected");
         Console.WriteLine("PASS: Windows shortcut checks");
     } finally {File.Delete(png);}
-} finally {if(Directory.Exists(directory)) Directory.Delete(directory,true);if(Directory.Exists(MainWindow.DataDirectory)) Directory.Delete(MainWindow.DataDirectory,true);}
+} finally {if(Directory.Exists(directory)) Directory.Delete(directory,true);if(Directory.Exists(MainWindow.DataDirectory)) Directory.Delete(MainWindow.DataDirectory,true);if(Directory.Exists(MainWindow.ShortcutDataDirectory)) Directory.Delete(MainWindow.ShortcutDataDirectory,true);}
 static void Check(bool value,string message) {if(!value) throw new Exception(message);Console.WriteLine("PASS: "+message);}
 [DllImport("shell32.dll",CharSet=CharSet.Unicode)] static extern uint DragQueryFile(IntPtr drop,uint index,System.Text.StringBuilder file,int count);
 [DllImport("ole32.dll")] static extern void ReleaseStgMedium(ref System.Runtime.InteropServices.ComTypes.STGMEDIUM medium);
-namespace VirCre.Desktop {internal static class MainWindow {internal static readonly string DataDirectory=Path.Combine(AppContext.BaseDirectory,"vircre-test-data-"+Guid.NewGuid().ToString("N"));}}
+namespace VirCre.Desktop {internal static class MainWindow {
+    internal static readonly string DataDirectory=Path.Combine(AppContext.BaseDirectory,"vircre-test-data-"+Guid.NewGuid().ToString("N"));
+    internal static readonly string ShortcutDataDirectory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"virCre","shell-test-"+Guid.NewGuid().ToString("N"));
+}}

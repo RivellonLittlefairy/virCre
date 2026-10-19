@@ -43,7 +43,7 @@ public sealed partial class MainWindow {
             if(dragFiles.TryGetValue(key,out var cached) && (cached.IsFaulted || cached.IsCanceled || cached.IsCompletedSuccessfully && !File.Exists(cached.Result.Path))) dragFiles.Remove(key);
             if(!dragFiles.TryGetValue(key,out var preparation)) {
                 if(dragFiles.Count>=64) dragFiles.Clear();
-                var staging=Path.Combine(DataDirectory,"drag");
+                var staging=Path.Combine(ShortcutDataDirectory,"drag");
                 CacheMaintenance.Prune(staging,29,TimeSpan.FromDays(7));
                 preparation=PrepareShortcutAsync(card,Path.Combine(staging,Guid.NewGuid().ToString("N")));
                 dragFiles[key]=preparation;

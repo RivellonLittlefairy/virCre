@@ -6,6 +6,8 @@ public sealed partial class MainWindow {
     private static readonly string PreferredDataDirectory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"virCre");
     internal static readonly DataLocation StorageLocation=DataLocation.Resolve(PreferredDataDirectory,Path.Combine(AppContext.BaseDirectory,"virCre-data"));
     internal static readonly string DataDirectory=StorageLocation.Path;
+    // Explorer consumes these files. Keep them outside legacy portable folders that may inherit Low integrity.
+    internal static readonly string ShortcutDataDirectory=Path.Combine(PreferredDataDirectory,"shell");
     private readonly SettingsStore settingsStore=new(Path.Combine(DataDirectory,"settings.json"));
     private Task settingsTask=Task.CompletedTask;
     private SettingsLoad LoadSettings() {

@@ -30,7 +30,7 @@ internal static class ShortcutFiles {
         string? iconPath=null;
         if(pngPath!=null && File.Exists(pngPath)) {
             var bytes=File.ReadAllBytes(pngPath);
-            var icons=Path.Combine(MainWindow.DataDirectory,"shortcut-icons");
+            var icons=Path.Combine(MainWindow.ShortcutDataDirectory,"shortcut-icons");
             Directory.CreateDirectory(icons);
             iconPath=Path.Combine(icons,IconCatalog.Hash(Convert.ToBase64String(bytes))+".ico");
             if(!File.Exists(iconPath)) File.WriteAllBytes(iconPath,IconFile.FromPng(bytes));
