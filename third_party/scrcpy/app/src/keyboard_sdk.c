@@ -301,8 +301,17 @@ sc_key_processor_process_text(struct sc_key_processor *kp,
                               const struct sc_text_event *event) {
     struct sc_keyboard_sdk *kb = DOWNCAST(kp);
 
-    if (kb->windows_ime) {
-        size_t length = strlen(event->text);
+    size_t length = strlen(event->text);
+    bool native_text = length > 0 && length <= 128;
+    for (size_t i = 0; native_text && i < length; ++i) {
+        unsigned char c = (unsigned char) event->text[i];
+        native_text = c >= 0x20 && c <= 0x7e;
+    }
+    // SDL_TEXT_INPUT already contains confirmed text, including when the IME
+    // explicitly commits Latin text. Keep these characters on the upstream SDK
+    // path instead of making all keyboard input depend on clipboard support.
+    // This is a route chosen before dispatch, never a replay after a failure.
+    if (kb->windows_ime && !native_text) {
         if (!length) {return;}
         if (length > SC_CONTROL_MSG_COMMIT_TEXT_MAX_LENGTH) {
             LOGE("IME commit exceeds size limit");

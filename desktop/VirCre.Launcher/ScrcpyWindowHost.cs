@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace VirCre.Launcher;
 
-public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWindowHost {
+public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<string>? inputDiagnostic=null) : IAppWindowHost {
     public static int? ParseDisplayId(string line) {
         var match=Regex.Match(line,@"New display:.*?\bid=(\d+)\)",RegexOptions.IgnoreCase);
         return match.Success && int.TryParse(match.Groups[1].Value,out var id) && id>0 ? id : null;
@@ -27,7 +27,7 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWin
         var process=new Process {StartInfo=start};
         foreach(var argument in Arguments(request))process.StartInfo.ArgumentList.Add(argument);
         if(bundledTools.SupportsWindowsIme)process.StartInfo.ArgumentList.Add("--windows-ime");
-        try {process.Start();return new ScrcpyProcess(process);}
+        try {process.Start();return new ScrcpyProcess(process,inputDiagnostic);}
         catch(System.ComponentModel.Win32Exception) {process.Dispose();throw new IOException("无法启动内置 scrcpy，请检查完整发布目录中的手机连接组件。");}
     }
     [GeneratedRegex(@"^[a-zA-Z0-9._:-]+$")]private static partial Regex SerialPattern();
@@ -39,11 +39,14 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWin
         private readonly Task completion;
         private readonly object logSync=new();
         private readonly Queue<string> recent=[];
+        private readonly HashSet<string> reportedInputFailures = new(StringComparer.Ordinal);
+        private readonly Action<string>? inputDiagnostic;
         private volatile bool exited;
         private int disposed,displayId;
         private int exitCode;
         private IntPtr window;
-        public ScrcpyProcess(Process process) {
+        public ScrcpyProcess(Process process, Action<string>? inputDiagnostic) {
+            this.inputDiagnostic=inputDiagnostic;
             this.process=process;processId=process.Id;
             var output=DrainAsync(process.StandardOutput);
             var error=DrainAsync(process.StandardError);
@@ -57,8 +60,21 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null) : IAppWin
         private async Task DrainAsync(StreamReader reader) {
             while(await reader.ReadLineAsync().ConfigureAwait(false) is { } line) {
                 lock(logSync){recent.Enqueue(line);while(recent.Count>24)recent.Dequeue();}
+                RecordInputFailure(line);
                 if(ParseDisplayId(line) is { } id)Volatile.Write(ref displayId,id);
             }
+        }
+        private void RecordInputFailure(string line) {
+            // Only fixed stage names, once per session/stage. Never persist arbitrary
+            // scrcpy output, submitted text, key codes, clipboard data or sequences.
+            string? stage=null;
+            foreach(var candidate in new[]{"display","clipboard-lock","clipboard","paste-key"}) {
+                if(line.EndsWith("IME commit rejected at "+candidate,StringComparison.Ordinal)) {stage=candidate;break;}
+            }
+            if(line.EndsWith("Text key injection failed",StringComparison.Ordinal)) stage="native-key";
+            if(stage==null)return;
+            lock(logSync) {if(!reportedInputFailures.Add(stage))return;}
+            inputDiagnostic?.Invoke(stage);
         }
         private async Task CompleteAsync(Task output,Task error) {
             await process.WaitForExitAsync().ConfigureAwait(false);

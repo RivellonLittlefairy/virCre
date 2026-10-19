@@ -70,6 +70,8 @@ struct sc_screen {
 
     SDL_Window *window;
     const char *window_title; // borrowed from options, valid for this session
+    bool input_keyboard_seen;
+    bool input_text_seen;
     SDL_Renderer *renderer;
 #ifdef SC_DISPLAY_FORCE_OPENGL_CORE_PROFILE
     SDL_GLContext gl_context;

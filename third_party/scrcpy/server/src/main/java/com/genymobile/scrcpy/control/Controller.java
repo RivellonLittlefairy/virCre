@@ -361,7 +361,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                     } catch (IOException | RuntimeException error) {
                         // A missing editor/focus or denied paste must not destroy the video window.
                         // Dispatch may be uncertain: never retry or log the submitted content.
-                        Ln.w("IME text dispatch was not confirmed; no automatic replay");
+                        Ln.w("IME commit rejected at " + imeCommitStage);
                         sender.send(DeviceMessage.createRejectText(msg.getSequence()));
                     }
                     return true;
@@ -483,7 +483,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         int successCount = 0;
         for (char c : text.toCharArray()) {
             if (!injectChar(c)) {
-                Ln.w("Could not inject char u+" + String.format("%04x", (int) c));
+                Ln.w("Text key injection failed");
                 continue;
             }
             successCount++;
@@ -748,16 +748,32 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         return ok;
     }
 
+    // Control-thread-only diagnostic state. Never contains submitted text or key data.
+    private String imeCommitStage = "display";
+
     private void commitText(String text, long sequence) throws IOException {
+        imeCommitStage = "display";
         if (!supportsInputEvents) {throw new IOException("IME input is unsupported on this display");}
+        final int targetDisplay = getActionDisplayId();
+        if (targetDisplay == Device.DISPLAY_ID_NONE) {throw new IOException("IME input display unavailable");}
+        imeCommitStage = "clipboard-lock";
         ImeCommitter.run(IME_CLIPBOARD_LOCK, 1000, () -> {
             if (Thread.currentThread().isInterrupted()) {throw new IOException("IME commit cancelled");}
+            imeCommitStage = "clipboard";
             ClipboardManager clipboard = ServiceManager.getClipboardManager();
             if (clipboard == null) {throw new IOException("IME clipboard unavailable");}
             isSettingClipboard.set(true);
             try {
                 clipboard.setImeText(text);
-                if (!pressReleaseKeycode(KeyEvent.KEYCODE_PASTE, Device.INJECT_MODE_WAIT_FOR_FINISH)) {
+                imeCommitStage = "paste-key";
+                // Web/Compose editors commonly handle Ctrl+V rather than KEYCODE_PASTE.
+                // Carry Ctrl only in this event's meta state, without holding a modifier
+                // key on the phone. Always release V even if the DOWN result is uncertain.
+                boolean down = Device.injectKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_V, 0,
+                        KeyEvent.META_CTRL_ON, targetDisplay, Device.INJECT_MODE_WAIT_FOR_FINISH);
+                boolean up = Device.injectKeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_V, 0,
+                        KeyEvent.META_CTRL_ON, targetDisplay, Device.INJECT_MODE_WAIT_FOR_FINISH);
+                if (!down || !up) {
                     throw new IOException("IME paste dispatch failed");
                 }
             } finally {isSettingClipboard.set(false);}

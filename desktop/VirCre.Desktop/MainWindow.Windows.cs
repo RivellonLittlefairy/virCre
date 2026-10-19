@@ -8,7 +8,7 @@ using VirCre.Presentation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
-    private readonly AppWindowManager appWindows = new(new ScrcpyWindowHost());
+    private readonly AppWindowManager appWindows = new(new ScrcpyWindowHost(inputDiagnostic: stage=>RuntimeDiagnostics.Write("input-rejected",details:stage)));
 
     private void AppWindows_Changed(object? sender, EventArgs args) => DispatcherQueue.TryEnqueue(() => {
         if (!closing) model.UpdateWindows(appWindows.Windows);

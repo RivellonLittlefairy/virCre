@@ -591,6 +591,8 @@ sc_screen_init(struct sc_screen *screen,
     const char *title = params->window_title;
     assert(title);
     screen->window_title = title;
+    screen->input_keyboard_seen = false;
+    screen->input_text_seen = false;
 
     int x = SDL_WINDOWPOS_UNDEFINED;
     int y = SDL_WINDOWPOS_UNDEFINED;
@@ -717,6 +719,11 @@ sc_screen_init(struct sc_screen *screen,
         goto error_destroy_texture;
     }
 #endif
+    if (params->windows_ime) {
+        char input_title[1024];
+        SDL_snprintf(input_title, sizeof(input_title), "%s | 电脑输入：等待按键", screen->window_title);
+        SDL_SetWindowTitle(screen->window, input_title);
+    }
 
     // Initialize even if not used for simplicity
     sc_mouse_capture_init(&screen->mc, screen->window, params->shortcut_mods);
@@ -1185,6 +1192,31 @@ sc_disconnect_on_timeout(struct sc_disconnect *d, void *userdata) {
 void
 sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
     switch (event->type) {
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            if (screen->im.windows_ime && !SDL_TextInputActive(screen->window)) {
+                if (!SDL_StartTextInput(screen->window)) {
+                    LOGE("Could not restore text input after focus change");
+                }
+            }
+            break;
+        case SDL_EVENT_KEY_DOWN:
+            if (screen->im.windows_ime && !screen->input_keyboard_seen) {
+                screen->input_keyboard_seen = true;
+                if (!screen->input_text_seen) {
+                    char title[1024];
+                    SDL_snprintf(title, sizeof(title), "%s | 电脑输入：已接收按键", screen->window_title);
+                    SDL_SetWindowTitle(screen->window, title);
+                }
+            }
+            break;
+        case SDL_EVENT_TEXT_INPUT:
+            if (screen->im.windows_ime) {
+                screen->input_text_seen = true;
+                char title[1024];
+                SDL_snprintf(title, sizeof(title), "%s | 电脑输入：已接收文字", screen->window_title);
+                SDL_SetWindowTitle(screen->window, title);
+            }
+            break;
         case SC_EVENT_OPEN_WINDOW: {
             struct sc_size *size = event->user.data1;
             assert(size);
@@ -1217,7 +1249,11 @@ sc_screen_handle_event(struct sc_screen *screen, const SDL_Event *event) {
             return;
         }
         case SC_EVENT_IME_COMMIT_ACCEPTED:
-            SDL_SetWindowTitle(screen->window, screen->window_title);
+            {
+                char title[1024];
+                SDL_snprintf(title, sizeof(title), "%s | 电脑输入：系统已派发", screen->window_title);
+                SDL_SetWindowTitle(screen->window, title);
+            }
             return;
         case SDL_EVENT_WINDOW_EXPOSED:
             sc_screen_render(screen, true);
