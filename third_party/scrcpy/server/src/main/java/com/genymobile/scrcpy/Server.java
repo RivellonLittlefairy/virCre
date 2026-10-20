@@ -184,6 +184,9 @@ public final class Server {
 
             Looper.loop(); // interrupted by the Completion implementation
         } finally {
+            // Start the camera cleanup deadline only once the server is exiting,
+            // before any codec stop/join that may block. Active sessions have no deadline.
+            if (cameraSession != null) cameraSession.beginShutdown();
             if (cleanUp != null) {
                 cleanUp.interrupt();
             }

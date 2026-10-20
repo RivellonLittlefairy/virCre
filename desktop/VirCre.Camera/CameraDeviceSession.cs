@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using VirCam.Core;
@@ -18,6 +19,7 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
     private string cameraState="等待应用打开虚拟相机";
     private readonly object diagnosticSync=new();
     private readonly HashSet<string> reported=[];
+    private readonly long started=Stopwatch.GetTimestamp();
     internal string CameraState=>Volatile.Read(ref cameraState);
     private string Socket=>"localabstract:vircre-"+session;
 
@@ -85,11 +87,29 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
                     "desktop-camera-first-frame"=>root.GetProperty("hasInput").GetBoolean()?"camera-first-frame-with-input":"camera-first-frame-without-input",
                     "render-error"=>"camera-render-failed", _=>null
                 };
+                if(kind.GetString()=="shutdown-started")stage="phone-shutdown-started";
+                if(kind.GetString()=="closed")stage="phone-resources-closed";
+                if(kind.GetString()=="input-disconnected") {
+                    stage=root.GetProperty("reason").GetString() switch {
+                        "SocketTimeoutException"=>"phone-input-timeout",
+                        "EOFException"=>"phone-input-eof",
+                        "IOException"=>"phone-input-io-error",
+                        _=>"phone-input-error"
+                    };
+                    if(root.TryGetProperty("phase",out var phase) && phase.GetString() is "accept" or "hello" or "packet" or "ack")
+                        stage+=" phase="+phase.GetString();
+                }
                 if(stage!=null) {
-                    bool first;lock(diagnosticSync)first=reported.Add(stage);
-                    if(first)diagnostic?.Invoke(stage); // Fixed stage only, never arbitrary process output or pixels.
+                    RecordStage(stage); // Fixed stage only, never arbitrary process output or pixels.
                 }
         } catch(Exception e) {ready.TrySetException(new IOException("虚拟摄像头初始化信息读取失败。",e));}
+    }
+    internal void ObserveProcessExit(int code)=>RecordStage("scrcpy-exited exitCode="+code.ToString(CultureInfo.InvariantCulture));
+    internal void RecordStage(string stage) {
+        bool first;lock(diagnosticSync)first=reported.Add(stage);
+        if(!first)return;
+        try {diagnostic?.Invoke(stage+" elapsedMs="+((long)Stopwatch.GetElapsedTime(started).TotalMilliseconds).ToString(CultureInfo.InvariantCulture));}
+        catch(Exception) { /* Diagnostics must not interrupt the camera data path. */ }
     }
     private async Task<string> AdbAsync(IReadOnlyList<string> args,CancellationToken token) {
         var result=await runner.RunAsync("adb",new[]{"-s",request.Serial}.Concat(args).ToArray(),TimeSpan.FromSeconds(12),token).ConfigureAwait(false);
@@ -135,7 +155,7 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
             if(list.Contains(mac,StringComparison.OrdinalIgnoreCase))throw new IOException();
             associationAttempted=false;
         }).ConfigureAwait(false);
-        if(failures.Count>0)throw new IOException("未能清理："+string.Join("、",failures)+"。请恢复原设备连接后重试关闭；手机摄像头进程最多615秒后自行退出。");
+        if(failures.Count>0)throw new IOException("未能清理："+string.Join("、",failures)+"。请恢复原设备连接后重试关闭；连接未恢复时不能确认手机进程已退出。");
     }
     private static string CreateMac() {
         var bytes=System.Security.Cryptography.RandomNumberGenerator.GetBytes(6);bytes[0]=(byte)((bytes[0]|2)&0xfe);

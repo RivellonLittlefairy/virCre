@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace VirCre.Launcher;
 
-public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<string>? inputDiagnostic=null, Action<string>? sessionEvents=null) : IAppWindowHost {
+public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<string>? inputDiagnostic=null, Action<string>? sessionEvents=null, Action<int>? processExited=null) : IAppWindowHost {
     public static int? ParseDisplayId(string line) {
         var match=Regex.Match(line,@"New display:.*?\bid=(\d+)\)",RegexOptions.IgnoreCase);
         return match.Success && int.TryParse(match.Groups[1].Value,out var id) && id>0 ? id : null;
@@ -40,7 +40,7 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
             process.StartInfo.ArgumentList.Add("--capture-orientation=@0");
         }
         if(bundledTools.SupportsWindowsIme)process.StartInfo.ArgumentList.Add("--windows-ime");
-        try {process.Start();return new ScrcpyProcess(process,inputDiagnostic,sessionEvents);}
+        try {process.Start();return new ScrcpyProcess(process,inputDiagnostic,sessionEvents,processExited);}
         catch(System.ComponentModel.Win32Exception) {process.Dispose();throw new IOException("无法启动内置 scrcpy，请检查完整发布目录中的手机连接组件。");}
     }
     [GeneratedRegex(@"^[a-zA-Z0-9._:-]+$")]private static partial Regex SerialPattern();
@@ -56,13 +56,15 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
         private readonly HashSet<string> reportedInputFailures = new(StringComparer.Ordinal);
         private readonly Action<string>? inputDiagnostic;
         private readonly Action<string>? sessionEvents;
+        private readonly Action<int>? processExited;
         private volatile bool exited;
         private int disposed,displayId;
         private int exitCode;
         private IntPtr window;
-        public ScrcpyProcess(Process process, Action<string>? inputDiagnostic, Action<string>? sessionEvents) {
+        public ScrcpyProcess(Process process, Action<string>? inputDiagnostic, Action<string>? sessionEvents, Action<int>? processExited) {
             this.inputDiagnostic=inputDiagnostic;
             this.sessionEvents=sessionEvents;
+            this.processExited=processExited;
             this.process=process;processId=process.Id;
             var output=DrainAsync(process.StandardOutput);
             var error=DrainAsync(process.StandardError);
@@ -110,7 +112,11 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
         private async Task CompleteAsync(Task output,Task error) {
             await process.WaitForExitAsync().ConfigureAwait(false);
             exitCode=process.ExitCode;exited=true;
-            await Task.WhenAll(output,error).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            try {await Task.WhenAll(output,error).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);}
+            finally {
+                try {processExited?.Invoke(exitCode);}
+                catch(Exception) { /* Diagnostics must not change process ownership or cleanup. */ }
+            }
         }
         public async Task WaitForReadyAsync(CancellationToken token) {
             while(!HasExited) {

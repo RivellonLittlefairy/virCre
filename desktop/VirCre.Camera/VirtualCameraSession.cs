@@ -41,7 +41,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
     internal VirtualCameraSession(AppLaunchRequest request,BundledTools tools,Action<string>? inputDiagnostic,Action<string>? notice,Action<string>? diagnostic) {
         this.request=request;this.notice=notice;
         targetFrameRate=CameraFrameRates.Validate(request.CameraFrameRate);
-        phone=new(request,tools,diagnostic);scrcpy=new(tools,inputDiagnostic,phone.ObserveServerLine);
+        phone=new(request,tools,diagnostic);scrcpy=new(tools,inputDiagnostic,phone.ObserveServerLine,phone.ObserveProcessExit);
         lifetime=Task.Run(RunAsync);
     }
     public Task WaitForReadyAsync(CancellationToken token)=>ready.Task.WaitAsync(token);
@@ -68,14 +68,21 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
             await frames.ConnectAsync(startup.Token).ConfigureAwait(false);
             ready.TrySetResult();
             await PumpAsync(stop.Token).ConfigureAwait(false);
+            phone.RecordStage("desktop-pump-ended");
         } catch(OperationCanceledException) when(stop.IsCancellationRequested) {ready.TrySetCanceled();}
         catch(OperationCanceledException e) {
             exitCode=1;
+            phone.RecordStage(ready.Task.IsCompletedSuccessfully?"desktop-frame-timeout":"desktop-startup-timeout");
             var message=ready.Task.IsCompletedSuccessfully?"PC 画面传输超时，请检查设备连接后重新打开。":"虚拟摄像头启动超时，请检查设备连接。";
             ready.TrySetException(new TimeoutException(message,e));notice?.Invoke(message);
         }
         catch(Exception e) {
             exitCode=1;ready.TrySetException(e);
+            phone.RecordStage(e switch {
+                EndOfStreamException=>"desktop-input-eof",
+                System.Net.Sockets.SocketException=>"desktop-input-socket-error",
+                _=>"desktop-session-error"
+            });
             notice?.Invoke("虚拟摄像头已停止："+e.Message);
         } finally {
             try {await CleanupAsync().ConfigureAwait(false);}
@@ -142,6 +149,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
     }
     public async Task CloseAsync() {
         if(exited)return;
+        phone.RecordStage("desktop-close-requested");
         try {stop.Cancel();}catch(ObjectDisposedException) when(exited) {return;}
         await lifetime.ConfigureAwait(false);
         if(!exited)await CleanupAsync().ConfigureAwait(false);

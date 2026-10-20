@@ -32,14 +32,17 @@ final class DesktopReceiver implements AutoCloseable {
     }
     private void acceptLoop() {
         while(!closed) {
+            String phase="accept";
             try(LocalSocket socket=server.accept()) {
                 client=socket;socket.setSoTimeout(2000);
+                phase="hello";
                 FrameProtocol.Packet hello=FrameProtocol.read(socket.getInputStream(),session,deviceId);
                 if(hello.type!=FrameProtocol.HELLO) throw new IOException("HELLO required");
                 frames.resetConnection();ack(socket,0);
                 AgentLog.event("input-connected");
                 long lastSequence=0;boolean active=false;
                 while(!closed) {
+                    phase="packet";
                     FrameProtocol.Packet packet=FrameProtocol.read(socket.getInputStream(),session,deviceId);
                     if(packet.sequence<=lastSequence) throw new IOException("Non-increasing sequence");
                     lastSequence=packet.sequence;
@@ -63,11 +66,12 @@ final class DesktopReceiver implements AutoCloseable {
                         if(active) AgentLog.event("input-paused","sequence",packet.sequence);
                         active=false;
                     } else throw new IOException("Unexpected input message");
+                    phase="ack";
                     ack(socket,packet.sequence);
                     if(packet.type==FrameProtocol.STOP) break;
                 }
             } catch(Exception e) {
-                if(!closed) AgentLog.event("input-disconnected","reason",e.getClass().getSimpleName());
+                if(!closed) AgentLog.event("input-disconnected","reason",e.getClass().getSimpleName(),"phase",phase);
             } finally { frames.pause();client=null; }
         }
     }
