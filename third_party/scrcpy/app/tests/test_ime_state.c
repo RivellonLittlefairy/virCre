@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #include "common.h"
 #include <assert.h>
 #include "ime_state.h"

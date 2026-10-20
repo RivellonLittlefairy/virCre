@@ -50,6 +50,7 @@ $fileVersion=(Get-Item -LiteralPath (Join-Path $publish 'VirCre.Desktop.exe')).V
 if($fileVersion -ne $expectedFileVersion) {throw "Published version does not match installer: $fileVersion"}
 if(Get-ChildItem -LiteralPath $publish -Filter '*.apk' -File -Recurse) {throw 'A test APK must not be included in the desktop package.'}
 if(Get-ChildItem -LiteralPath (Join-Path $publish 'docs') -Filter 'code-review-*.md' -File -Recurse) {throw 'Local code review notes must not be included in the desktop package.'}
+& (Join-Path $PSScriptRoot 'Test-DistributionCompliance.ps1') -OutputDirectory $publish
 & $Compiler "/DPublishDir=$publish" "/DSetupDir=$OutputDirectory" "/DAppVersion=$Version" "/DAppFileVersion=$expectedFileVersion" (Join-Path $repo 'packaging\virCre.iss')
 if($LASTEXITCODE -ne 0) {throw 'Inno Setup compilation failed'}
 $setup=Join-Path $OutputDirectory "virCre-$Version-win-x64-setup.exe"

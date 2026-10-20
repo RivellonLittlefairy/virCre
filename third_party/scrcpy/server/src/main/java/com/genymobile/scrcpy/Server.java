@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.audio.AudioCapture;

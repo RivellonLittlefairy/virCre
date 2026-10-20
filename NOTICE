@@ -1,0 +1,28 @@
+virCre
+Copyright 2026 virCre contributors
+
+Original virCre source code is licensed under the Apache License, Version 2.0.
+This does not relicense third-party source, libraries, images or runtime files.
+
+This distribution includes a modified version of scrcpy 5.0.1:
+Copyright (C) 2018 Genymobile
+Copyright (C) 2018-2026 Romain Vimont
+https://github.com/Genymobile/scrcpy
+Upstream commit: a60891aea193d92e7e5c3942700eca63f9d19a5f
+Licensed under the Apache License, Version 2.0.
+Modified for virCre: Windows IME composition and Unicode text transactions;
+Windows capture exclusion and live move/resize rendering; Android 16 virtual
+camera/display integration; window startup sizing and related tests/builds.
+The modified files carry a modification notice. See docs/scrcpy-changes.html
+and the matching source snapshot shipped in compliance/sources/virCre-source.zip.
+This is an independent distribution, not an official scrcpy release or an
+endorsement by Genymobile, Romain Vimont, Microsoft or other upstream authors.
+
+Additional third-party attribution, license scope and replacement instructions
+are in THIRD-PARTY-NOTICES.html. Microsoft binary components retain their own
+license terms; see compliance/THIRD-PARTY-TERMS.rtf and compliance/licenses/nuget.
+FFmpeg and libusb retain LGPL-2.1-or-later; their corresponding sources and
+build recipes are provided with the distribution. LGPL libraries may be
+replaced with interface-compatible builds. Reverse engineering needed to debug
+such modifications is permitted under LGPL; Microsoft-specific restrictions
+do not extend to these LGPL components or to the original Apache-licensed code.

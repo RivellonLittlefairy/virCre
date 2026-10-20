@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #include "screen.h"
 #ifdef _WIN32
 #include "sys/win/ime.h"

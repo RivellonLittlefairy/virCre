@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #ifndef SC_INPUTMANAGER_H
 #define SC_INPUTMANAGER_H
 

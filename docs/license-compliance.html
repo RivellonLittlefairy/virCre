@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>virCre · Apache 授权与分发材料</title><style>body{max-width:1040px;margin:32px auto;padding:0 24px 60px;font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;color:#20382e}section{border:1px solid #dbe5df;border-radius:12px;padding:18px 24px;margin:18px 0}h1,h2{color:#17684d}a{color:#17684d}code,pre{background:#f1f5f3;overflow-wrap:anywhere}pre{padding:16px;white-space:pre-wrap}.note{padding:14px;background:#fff6df}table{width:100%;border-collapse:collapse}td,th{padding:9px;text-align:left;border-bottom:1px solid #ddd}</style></head><body>
+<h1>Apache 2.0 授权与分发材料</h1><p>日期：2026-10-20。用户决定将 virCre 原创部分采用 Apache License 2.0。此页记录当前版本的实施范围、构建行为和验证边界。</p>
+<section><h2>1. 项目授权</h2><p>根目录 <a href="../LICENSE">LICENSE</a> 是 Apache 2.0 标准全文，<a href="../NOTICE">NOTICE</a> 保留项目和 scrcpy 上游归属。原创代码版权属于各贡献者；scrcpy 与其他第三方内容保留其原权利人、许可和声明。<code>Directory.Build.props</code> 为自有 .NET 工程设置 Apache-2.0 包元数据。</p><p>Apache 2.0 本身不要求公开修改版源码。此次选择主动将匹配的完整项目源码随包提供，既便于用户审查修改，也保留依赖所需的构建材料；不能据此把 Microsoft 专有运行二进制改为 Apache。</p></section>
+<section><h2>2. scrcpy 改动声明</h2><p>以 v5.0.1 / <code>a60891aea193d92e7e5c3942700eca63f9d19a5f</code> 为上游基线。所有当前修改过的 C、头文件、Java 与 Meson 文件顶部增加显著的 <code>Modified for virCre (2026)</code> 标记，原有版权和注释保留。分类和文件列表见 <a href="scrcpy-changes.html">scrcpy 修改记录</a>。</p></section>
+<section><h2>3. 对应源码与许可证</h2><p><code>third_party/distribution-lock.json</code> 锁定原样分发的 ADB、SDL、FFmpeg、libusb 二进制 SHA-256，以及 FFmpeg 9.0.2、libusb 1.0.30、SDL 3.4.18、dav1d 1.5.4 和 zlib 1.3.1 的源码包地址和 SHA-256。首次下载校验成功后缓存在 <code>.cache/compliance-sources</code>，发布时把真实源码包复制进成品，不仅附带远程链接。</p><p>FFmpeg 的 LGPL 2.1-or-later 状态通过实际 DLL 的 <code>avcodec_license</code> 等导出函数确认，构建配置也写入清单。新二进制必须通过锁文件审查；检测到 GPL/nonfree/version3 构建选项时当前流程停止。libusb 由原始发行包哈希对应到锁定版本。FFmpeg 静态依赖 dav1d 与 zlib 的许可和源码一并保留。</p><p>MinGW-w64 CRT、头文件、GCC Runtime Library Exception 与 winpthreads 许可保存在 <code>third_party/licenses/compiler-runtime/</code>。ADB 保留完整 platform-tools NOTICE。</p><p>每次发布从实际的 <code>project.assets.json</code> 和自包含 .NET 运行包读取版本，收集 license、NOTICE、ThirdPartyNotices。这样升级 NuGet 后不会静默沿用旧版微软条款；不能识别的包要求先审查。主项目 <a href="../THIRD-PARTY-NOTICES.html">第三方说明</a> 随成品分发。</p></section>
+<section><h2>4. 安装器和便携版</h2><p>现有 <code>Publish-Desktop.ps1</code> 在生成目录后强制准备并检查分发材料。<code>Build-Installer.ps1</code> 在编译安装器前再检查一次。<code>-SkipTests</code> 不跳过这项分发文件检查。</p><pre>pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1.1</pre><p>安装器递归携带所有材料，并显示从当前微软组件原文生成的独立条款。这个条款页只对各自的 Microsoft 组件适用，不覆盖项目 Apache 授权或 LGPL 库替换和调试权利。开始菜单增加“开源许可与源码”入口。ZIP 同样包含全部材料，使用便携版前应阅读随包条款。</p><pre>安装目录/
+  LICENSE
+  NOTICE
+  THIRD-PARTY-NOTICES.html
+  compliance/
+    manifest.json
+    distribution-lock.json
+    source-files.json
+    THIRD-PARTY-TERMS.rtf
+    licenses/native/...
+    licenses/nuget/...
+    sources/virCre-source.zip
+    sources/ffmpeg-9.0.2.tar.xz
+    sources/libusb-1.0.30.tar.gz
+    sources/sdl-3.4.18.tar.gz
+    sources/dav1d-1.5.4.tar.xz
+    sources/zlib-1.3.1.tar.gz</pre><p>源码 ZIP 只收集受控的项目、第三方源码、脚本、许可及相关说明，不包含 <code>.git</code>、本地配置、构建缓存、设备日志或签名私钥。Microsoft 二进制源码不在此快照的授权范围。</p></section>
+<section><h2>5. 发布前的检查</h2><p><code>Prepare-DistributionCompliance.ps1</code> 生成材料。<code>Test-DistributionCompliance.ps1</code> 检查必需文件、源码包锁、核心源码快照、Microsoft/.NET 声明和发布文件哈希。缺文件、改动材料、换入未经审查的 DLL 或使用与当前源码不匹配的自定义运行时，均应中止发布。</p><pre>pwsh -NoProfile -File .\tools\Test-DistributionCompliance.ps1 -OutputDirectory '&lt;发布目录&gt;'</pre><p id="verification">2026-10-20：实际重编译了带修改声明的 Release scrcpy 客户端与 server，并编译 0.1.1 WinUI 发布目录、EXE 安装器和便携 ZIP。文件校验通过；实际 ZIP 的发布文件和源码快照逐项 SHA-256 检查通过。故意改动 NOTICE、移走 libusb 源码、替换 libusb DLL、改动源码指纹的四项异常均被拦截，恢复后再次校验通过。审查发现的隐式 SDK 运行包清单缺口已补上：旧清单被新门禁拒绝，补齐后收集 15 个包的许可、5 份依赖源码，并核对 622 个发布文件。没有运行安装器或操作手机，不据此声称安装、升级、卸载、干净系统及设备功能已验收。</p><p>除普通 NuGet 依赖外，还从实际成品 <code>.deps.json</code> 识别全部 runtimepack。对于 <code>Microsoft.Windows.SDK.NET.Ref/10.0.19041.56</code> 这种仅提供 licenseUrl 的隐式包，保留官方原始 SDK RTF、可读文本、固定地址与 SHA-256，并加入安装器条款；运行包版本或许可 URL 变化时须重新审查。</p><p class="note">此前生成的 0.1、0.1.0 等旧安装器没有自动获得新材料。本轮应只分发重新生成并检查过的 0.1.1 安装器和便携包；不要把新许可证文本与旧二进制压缩包混用。</p></section>
+<section><h2>6. 仍需遵守的范围</h2><p>再次分发时保留全部许可、归属、源代码包和适用 Microsoft 条款；分发者仍需承担原文中的自身义务。升级依赖、引入额外编解码器、修改 FFmpeg/libusb、静态链接方式变化或改变平台时，需重新审查当前锁定组合。</p><p>技术检查覆盖材料和一致性，不替代应用功能验收，不代表商标、专利或所有司法辖区的问题已经穷尽。本次不创建远程发布、不推送代码，也不替用户签署第三方合同或公开历史日志。</p></section>
+</body></html>

@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #include "capture.h"
 #include <windows.h>
 #include "util/log.h"

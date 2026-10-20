@@ -1,3 +1,4 @@
+# Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 src = [
     'src/adb/adb.c',
     'src/adb/adb_device.c',

@@ -1,2 +1,3 @@
 # Upstream license snapshots retain their original bytes and whitespace.
 third_party/licenses/* -text -whitespace
+third_party/licenses/** -text -whitespace

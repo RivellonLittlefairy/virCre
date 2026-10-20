@@ -24,5 +24,7 @@ Get-ChildItem -LiteralPath (Join-Path $repo 'docs') | Where-Object {$_.PSIsConta
 $selectedGuide=if($GuidePage) {$GuidePage} elseif($Runtime -eq 'Custom') {'windows-ime-preview.html'} else {'desktop-shortcuts.html'}
 $guide='<meta charset="utf-8"><meta http-equiv="refresh" content="0;url=docs/'+$selectedGuide+'"><a href="docs/'+$selectedGuide+'">打开使用说明</a>'
 Set-Content -LiteralPath (Join-Path $OutputDirectory '使用说明.html') -Value $guide -Encoding utf8
+& (Join-Path $PSScriptRoot 'Prepare-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory
+& (Join-Path $PSScriptRoot 'Test-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory
 Write-Output "Ready: $OutputDirectory\VirCre.Desktop.exe"
 Write-Output 'ADB and scrcpy are bundled in runtime\scrcpy. Keep the complete folder in a stable location before creating shortcuts.'

@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #ifndef SC_RECEIVER_H
 #define SC_RECEIVER_H
 

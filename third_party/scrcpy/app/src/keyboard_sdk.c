@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #include "keyboard_sdk.h"
 
 #include <assert.h>

@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 package com.genymobile.scrcpy.control;
 
 import com.genymobile.scrcpy.util.StringUtils;

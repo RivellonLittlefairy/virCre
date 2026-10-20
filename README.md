@@ -58,4 +58,12 @@ pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1.1
 
 设置、应用缓存和持久快捷方式图标保存在当前用户的 `%LOCALAPPDATA%\virCre`；安装器卸载默认保留这些数据。移动便携程序目录后，指向旧目录的手机应用快捷方式需重新创建。
 
-首版成品未做代码签名。内置第三方许可位于 `runtime/scrcpy/licenses` 和 `runtime/scrcpy/LICENSE.txt`；本仓库尚未指定主项目开源许可证，公开分发前需明确授权及第三方分发要求。
+首版成品未做代码签名。virCre 原创源码采用 **Apache License 2.0**，见根目录 `LICENSE` 和 `NOTICE`；第三方源码和运行组件保留各自授权，不统一改为 Apache。
+
+- [第三方许可、对应源码与库替换说明](THIRD-PARTY-NOTICES.html)
+- [许可处理与分发检查说明](docs/license-compliance.html)
+- [scrcpy 修改记录](docs/scrcpy-changes.html)
+
+发布与打包会强制附带 `compliance/`：包含 FFmpeg、libusb 等锁定版本的对应源码包、完整修改版项目源码快照、原始许可证、实际 NuGet 包声明，以及 Microsoft 二进制组件的独立适用条款。安装器展示这些条款，便携版使用者也需阅读随包说明。缺少材料、库哈希不匹配或源码与自定义运行时指纹不符时停止分发构建；`-SkipTests` 不跳过这项文件检查。
+
+更新依赖后必须同步审查 `third_party/distribution-lock.json`、源码和许可材料。当前的技术检查不等于对未来版本或所有使用方式作法律保证。

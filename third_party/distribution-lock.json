@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "scrcpyVersion": "5.0.1",
+  "scrcpyCommit": "a60891aea193d92e7e5c3942700eca63f9d19a5f",
+  "upstreamArchiveSha256": "b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5",
+  "unchangedBinaries": {
+    "adb.exe": "b4a6b455702684652cccf7b46258b29e653538904359a58fd4931cf3ef286b3f",
+    "AdbWinApi.dll": "c1d653030b4bde65d3e07e4d0b0979e17be56df1436cdd15528630f27808050d",
+    "AdbWinUsbApi.dll": "0710e894d9b40f71a670c13c694079d564c92c1279da382cfe4850983aaebe1b",
+    "SDL3.dll": "288aaf5b4f246bd84c276351867e3132cfcd9b0a9d25fb679c8d94b30cdf333e",
+    "avcodec-63.dll": "159928e3bbe7beaca046ccf831fdf44f1e5559c0e63417f007889a6bb2c5de88",
+    "avformat-63.dll": "4dbb0c1c8262f7ae45e7edc4866e26f53b358bf4fc7a0b971f15d1f2d7baf22f",
+    "avutil-61.dll": "52eb504ced0ea6d9e936d348df51c8aaeec1cae8fa4a7dba339fea87d7cce725",
+    "swresample-7.dll": "7b57e891bf09c43422d79f98cf9d1830c4b1d48a251423ce5fb8c2048eb8fc1e",
+    "libusb-1.0.dll": "0c82e969c046d816507a2fe1e57253a334cb203bd6ea223194ad17c007154f32"
+  },
+  "sources": [
+    {
+      "license": "LGPL-2.1-or-later",
+      "id": "ffmpeg",
+      "file": "ffmpeg-9.0.2.tar.xz",
+      "version": "9.0.2",
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+    },
+    {
+      "license": "LGPL-2.1-or-later",
+      "id": "libusb",
+      "file": "libusb-1.0.30.tar.gz",
+      "version": "1.0.30",
+      "sha256": "2ae28adb0bb9558c86135c4e1c11b320b0805461e207a64a6e520a114094bf07",
+      "url": "https://github.com/libusb/libusb/archive/refs/tags/v1.0.30.tar.gz"
+    },
+    {
+      "license": "Zlib",
+      "id": "sdl",
+      "file": "sdl-3.4.18.tar.gz",
+      "version": "3.4.18",
+      "sha256": "c4b08b950bd29d83caae0ab8d884298d27046a9d30700fb42841c50992665c90",
+      "url": "https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.18.tar.gz"
+    },
+    {
+      "license": "BSD-2-Clause",
+      "id": "dav1d",
+      "file": "dav1d-1.5.4.tar.xz",
+      "version": "1.5.4",
+      "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5",
+      "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
+    },
+    {
+      "license": "Zlib",
+      "id": "zlib",
+      "file": "zlib-1.3.1.tar.gz",
+      "version": "1.3.1",
+      "sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+      "url": "https://zlib.net/fossils/zlib-1.3.1.tar.gz"
+    }
+  ],
+  "packageLicenseOverrides": [
+    {
+      "files": {
+        "Microsoft.Windows.SDK.NET.Ref-10.0.19041.56.sdk_license.rtf": "dd07eb178e00c6bba4148457fc00ff77cd4887eb521d504186fe59c9ec8bbe62",
+        "Microsoft.Windows.SDK.NET.Ref-10.0.19041.56.sdk_license.rtf.txt": "5238259f6446dcaa7128b806d9b07fd28320e4b6bf05109704a8356f7449e476"
+      },
+      "licenseUrl": "https://aka.ms/WinSDKLicenseURL",
+      "resolvedUrl": "https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf",
+      "termsText": "Microsoft.Windows.SDK.NET.Ref-10.0.19041.56.sdk_license.rtf.txt",
+      "version": "10.0.19041.56",
+      "id": "Microsoft.Windows.SDK.NET.Ref"
+    }
+  ]
+}

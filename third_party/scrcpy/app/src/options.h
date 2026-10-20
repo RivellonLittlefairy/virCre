@@ -1,3 +1,4 @@
+// Modified for virCre (2026); see docs/scrcpy-changes.html in the distribution.
 #ifndef SCRCPY_OPTIONS_H
 #define SCRCPY_OPTIONS_H
 
