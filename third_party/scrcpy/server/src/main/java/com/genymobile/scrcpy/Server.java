@@ -23,6 +23,7 @@ import com.genymobile.scrcpy.video.ScreenCapture;
 import com.genymobile.scrcpy.video.SurfaceCapture;
 import com.genymobile.scrcpy.video.SurfaceEncoder;
 import com.genymobile.scrcpy.video.VideoSource;
+import com.example.vircam.shell.ApplicationCameraSession;
 
 import android.annotation.SuppressLint;
 import android.os.Build;
@@ -103,7 +104,21 @@ public final class Server {
         List<AsyncProcessor> asyncProcessors = new ArrayList<>();
 
         DesktopConnection connection = DesktopConnection.open(scid, tunnelForward, video, audio, control, sendDummyByte);
+        ApplicationCameraSession cameraSession = null;
         try {
+            if (options.getVircreCamera() != null) {
+                if (Build.VERSION.SDK_INT < 36 || options.getNewDisplay() == null || !video || !control
+                        || options.getVideoSource() != VideoSource.DISPLAY) {
+                    throw new IOException("Virtual camera requires a controlled Android 16 new display");
+                }
+                try {
+                    // scrcpy intentionally disables System.out. Route session metadata
+                    // through its preserved console stream instead of losing the ready event.
+                    cameraSession = ApplicationCameraSession.open(options.getVircreCamera(), Ln::i);
+                } catch (Exception e) {
+                    throw new IOException("Could not create virtual camera device", e);
+                }
+            }
             if (options.getSendDeviceMeta()) {
                 connection.sendDeviceMeta(Device.getDeviceName());
             }
@@ -143,7 +158,7 @@ public final class Server {
                 if (options.getVideoSource() == VideoSource.DISPLAY) {
                     NewDisplay newDisplay = options.getNewDisplay();
                     if (newDisplay != null) {
-                        surfaceCapture = new NewDisplayCapture(controller, options);
+                        surfaceCapture = new NewDisplayCapture(controller, options, cameraSession);
                     } else {
                         assert options.getDisplayId() != Device.DISPLAY_ID_NONE;
                         surfaceCapture = new ScreenCapture(controller, options);
@@ -190,6 +205,7 @@ public final class Server {
                 // ignore
             }
 
+            if (cameraSession != null) cameraSession.close();
             connection.close();
         }
     }

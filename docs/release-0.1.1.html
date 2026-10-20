@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>virCre 0.1.1 变更与已知限制</title>
+<style>body{font:16px/1.8 system-ui,"Microsoft YaHei",sans-serif;max-width:960px;margin:36px auto;padding:0 24px;color:#233b33}h1,h2{line-height:1.4}code{background:#eef3f0;padding:2px 5px;overflow-wrap:anywhere}li{margin:8px 0}.note{padding:16px;background:#edf5f1}</style></head><body>
+<h1>virCre 0.1.1</h1><p>2026-10-20。应用版本为 <code>0.1.1</code>，Windows 文件与程序集版本为 <code>0.1.1.0</code>。</p>
+<h2>功能调整</h2><ul>
+<li>桌面快捷方式可直接打开手机应用。通过链接启动时主界面保持隐藏，不加载完整应用目录；最后一个应用窗口关闭后结束后台会话。连接失败时显示主界面和原因。旧测试目录中的链接需在新版重新创建。</li>
+<li>新窗口使用手机主屏的尺寸和DPI，跟随手机自然方向的比例，初始窗口适应电脑可用空间；不再固定1440×2560或720×1280窗口。虚拟摄像头沿用实际虚拟显示尺寸，编码器可能做少量像素对齐。</li>
+</ul><h2>可靠性修复</h2><ul>
+<li>隔离窗口事件订阅者异常，锁外通知，保证启动失败可以结束等待；保留未完成关闭工作的进程归属。</li>
+<li>关闭等待增加15秒上限，超时恢复收尾界面，重试复用未完成的清理任务。</li>
+<li>快捷方式复制成功后删除临时文件；回退链接正常可写时新旧格式合计保留最多30次、最长7天。已知图标丢失时提示刷新，避免静默生成默认图标。</li>
+<li>目录格式异常增加来源标记，缩小全局恢复范围并清空过期设备选择；拖拽结束始终释放指针捕获。</li>
+<li>Android EGL逐流、逐资源清理，单个释放或诊断失败不跳过后续资源；保留进程硬截止兜底。</li>
+</ul><h2>关面板与点击诊断</h2>
+<p>新窗口启用虚拟显示保活。手机亮屏解锁后，在电脑应用窗口按<strong>左Alt+O</strong>，可关闭手机面板，并在此会话中额外维持主屏交互；在原窗口按<strong>左Alt+Shift+O</strong>恢复面板。用户已确认，这种面板黑色状态下，B站个人页按钮仍可点击。</p>
+<p>面板关闭不等于锁屏。程序不自动唤醒或解锁、不修改系统超时；每4秒观察到主屏休眠时取消额外保活。多个窗口共享物理面板，某个会话恢复或退出可能影响其他窗口的关面板意图。有限诊断只记录固定触控与电源阶段，不记录坐标、输入文字或页面内容。</p>
+<div class="note"><strong>暂缓项：</strong>手机真正休眠或锁屏时，部分App控件仍可能不响应，尚未定位到具体控件处理机制。本轮按用户要求停止继续排查；未实现VirtualTouchscreen输入后端，也不宣称已修复所有App的锁屏交互。</div>
+<h2>验证范围</h2><p id="verification">本次提交前的桌面Release编译通过（0警告、0错误），已核对编译后文件版本0.1.1.0；内置scrcpy/Java Release编译通过，19个运行时文件的SHA256与manifest一致，PowerShell安装器脚本语法和git diff --check通过。按用户要求，不自动运行测试、GUI、安装器或手机操作。关面板点击的结果来自用户手动验证，不代表全部设备、App或真正锁屏场景均已通过。</p>
+<p><a href="review-followup-2026-10-20.html">逐项审查处理记录</a> · <a href="windows-packaging.html">构建安装包</a></p>
+</body></html>

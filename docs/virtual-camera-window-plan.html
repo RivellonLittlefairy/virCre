@@ -1,0 +1,43 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>虚拟摄像头直连修复计划与记录</title>
+<style>body{font:16px/1.8 system-ui;max-width:960px;margin:40px auto;padding:0 24px}code{background:#eee;padding:2px 5px}</style>
+<h1>虚拟摄像头直连修复计划与记录</h1>
+<p>用户目标：真实应用的相机读取电脑投屏窗口盖住的下方桌面，跟随位置、大小，无图片、无框选。早期由右键进入，现按下方“设置与默认启用”改为直接打开应用时默认启用。只编译打包，由用户手动验证，不自动操作手机或运行测试。</p>
+<h2>事实与决策</h2><ul>
+<li>默认镜像曾随主屏关闭而 OFF，导致微信整窗黑屏。独立 SurfaceFlinger 输出使微信界面显示，但扫一扫仍黑。</li>
+<li>18:21:30 crash buffer 记录 SurfaceFlinger PresentAsyncTHD SIGABRT、Scudo 内存释放错误，随后图形系统重启/ADB断开。具体 native 根因未定；撤回手工 SF 输出实现。</li>
+<li>相机、VDM显示和scrcpy编码器改为同进程持有。复用 NewDisplayCapture 的 VirtualDisplay.setSurface 输出编码，不创建额外镜像显示。</li>
+<li>PC输入约5fps，相机声明/按请求供帧最高30fps并复用最新桌面；增加流配置、首帧提交等固定诊断阶段，不记录图像或输入内容。</li></ul>
+<h2>文件与步骤</h2><ol>
+<li>Android新增 ApplicationCameraSession，复用 VirtualDeviceAdapter、DesktopReceiver、EglPattern；复用已有 ActivityThread，保持600/615秒期限；把VD Surface接到编码器。</li>
+<li>scrcpy移除 display-mirror-independent 与 IndependentDisplayCapture；新增 vircre-camera 选项，Options/Server/NewDisplayCapture接线；构建时嵌入shell源码。普通模式默认关闭该选项。</li>
+<li>桌面只准备CDM关联，监听所属scrcpy输出中的已验证JSON ready事件后建forward；保留精准清理与关闭失败重试。相机状态弹窗与固定阶段日志接入。</li>
+<li>构建内置scrcpy与桌面包，输出 out/desktop-camera-direct；核对manifest、源码清理和发布文件。独立只读审查后交用户手测。</li></ol>
+<h2>约束与审查重点</h2><ul>
+<li>Android API36、用户0、单相机会话；只对当前VDM生效；窗口采集排除自身，异常暂停，PAUSE每500ms。</li>
+<li>Server初始化中途失败、编码器重建、期限退出、shutdown hook与资源清理需幂等；看门狗不能与可能阻塞的close共用单线程。</li>
+<li>只按当前GUID核对远端scrcpy PID；不删除共享server jar、不杀其他窗口或真实应用进程。</li>
+<li>编译与静态审查不等于微信相机读回、扫码或稳定性通过。</li></ul>
+<h2>执行状态</h2><p>Android/scrcpy客户端与服务端、桌面相机类库及完整WinUI发布均已编译成功。发布目录为 out/desktop-camera-direct；内置运行时所有文件的SHA256与manifest一致，特性包含 windows-ime-v1、window-capture-exclusion-v1、vdm-direct-encoder-v1，不包含已撤回的 independent-display-capture-v1。git diff --check通过。没有执行测试或自动启动微信。</p>
+<p>独立只读审查发现并修正：scrcpy会关闭System.out，嵌入模式的ready事件必须通过保留的Ln输出通道发送；已通过Consumer注入Ln::i，桌面兼容此前缀。另将615秒硬退出看门狗改为独立daemon线程，不随会话close取消，覆盖后续编码器stop/join卡住的情况。上述修正已重新编译并发布。微信相机、扫码及厂商图形系统稳定性仍未验证。</p>
+<h2>历史：固定720p高清升级（已由下方同分辨率版本替代）</h2>
+<p>新增目标1280×720、PC真实更新目标15fps、JPEG质量0.88。相机仍最高30fps复用最新画面。复用画布与定点双线性映射，按整帧耗时调度，维持单在途帧；弹窗显示近期ACK确认fps/Mbps。跨端协议允许两种固定分辨率与PNG/JPEG，4MiB上限，解码前核对真实尺寸/MIME；通过ready字段与camera-hd-jpeg-v1特性验证配套版本。旧P0默认保持640PNG。</p>
+<p>发布目录out/desktop-camera-hd；只编译打包、不执行测试或操作手机。15fps为目标，720p画质、实际帧率、CPU/发热与无线稳定性待用户手动验证；后续1080p30建议硬件视频链路。</p>
+<h2>按投屏分辨率修正（2026-10-19）</h2>
+<p>用户指出扫描软件需要全画面，固定横屏720p不符合当前1440×2560竖屏显示。尺寸链路改为：scrcpy解析并对齐实际虚拟显示尺寸 → attachEncoder时创建相同尺寸的VDM显示和虚拟相机 → ready返回输入/显示尺寸 → PC验证相等并按该尺寸输出JPEG。原成功的VDM显示直连编码器架构保留。</p>
+<p>跨端协议改为有界动态尺寸，保留4MiB压缩帧限制，单边上限4096、像素上限4096×2160；解码前核对本会话尺寸与MIME。PC根据默认scrcpy letterbox比例裁出实际手机画面覆盖区域，按行复制并复用裁片缓冲，由WinRT BitmapEncoder线性缩放，输出不再额外留黑边。恢复后立即重置ACK统计状态。新增camera-display-size-v1运行时门槛。</p>
+<p>目标仍15fps，实际受采集、缩放、JPEG编码、网络、手机解码影响；默认输出比720p像素多4倍。缩放不增加原桌面的真实细节。固定尺寸会话按启动方向映射，不宣称运行中旋转或flex-display已支持；第三方App最终预览/分析尺寸不受本工具强制。发布到out/desktop-camera-display，只编译打包，手动确认画面方向、全画面映射、扫码与性能。</p>
+<p>只读审查指出客户端90°旋转会使viewport与固定相机比例不符。已在相机模式禁用客户端旋转/翻转，同时增加capture-orientation=@0固定采集视频自然方向，普通窗口不受影响。此限制保证当前映射前提，不宣称任意客户端旋转已支持。</p>
+<h2>同分辨率版本交付检查</h2>
+<p>桌面相机类库Release编译成功，0警告、0错误；内置scrcpy客户端与Android服务端重新编译成功，只有既有ShellMain过时API提示；完整WinUI发布成功。out/desktop-camera-display必需文件齐全，内置运行时19个文件SHA256均与manifest匹配，五个特性齐全且无已撤回的独立SF特性，用户指南副本一致，git diff --check通过。</p>
+<p>独立只读审查最终无Critical/Important遗留。以上仅为编译、文件一致性和源码审查结论，没有执行测试、启动投屏、安装APK或操作手机。1440×2560取景、二维码识别、实际帧率和功耗由用户手动确认。</p>
+<h2>Windows拖动期间冻结（2026-10-19）</h2>
+<p>用户要求按住窗口拖动时持续更新画面。只读本地日志显示最近一次会话完成相机流配置、桌面首帧提交，未记录对应自动暂停。内置SDL3.dll为3.4.18；核对官方同版本源码，Windows WM_ENTERSIZEMOVE定时器会在模态循环发送EXPOSED(data1=1)，但scrcpy原观察器只处理缩放事件，新帧一直等待普通事件循环。</p>
+<p>修复screen.c/h：仅Windows相机模式、主线程、本窗口的模态EXPOSED通知显示最新帧，检查shown/disconnected/paused状态，防重入并将模态重绘上限设为约30fps。互斥锁保护frame_event_pending，模态消费保留通知标志，普通新帧事件清除标志；没有帧时不重复消费，避免松手后的过期通知断言或无界积压。模态更新不自动改窗口大小，销毁时先撤销观察器。供帧、分辨率、相机架构及正常暂停条件不改。</p>
+<p>新增camera-live-move-v1并在桌面宿主核对配套特性，发布到out/desktop-camera-drag。只编译与静态审查，不运行测试、不操作手机。用户手动验证同屏内持续拖动、保持按住不移动、边缘缩放、松手后最新帧、手动暂停仍生效，以及原有离屏/跨屏/锁屏保护。</p>
+<p>交付检查完成：内置scrcpy客户端/服务端重新编译成功、完整WinUI发布成功。desktop-camera-drag必需文件齐全，运行时19个文件SHA256与manifest一致，发布客户端与本轮构建一致，六个特性包含camera-live-move-v1，无已撤回SF特性，指南副本一致，git diff --check通过。最终只读审查未发现明确Critical/Important。没有自动启动程序、操作手机或执行测试，连续拖动和缩放效果由用户手动验证。</p>
+<h2>设置与默认启用（2026-10-19）</h2>
+<p>用户确认拖动版本可用，要求帧率放入设置、相机默认启用、取消右键模式选择。现设置提供全局虚拟摄像头开关（默认开启）和1–30fps整数目标（默认15），复用本地UserSettings、串行原子保存。保留Version1，缺失新字段使用开启/15，显式false保留，越界持久化帧率恢复15；不改已有主题与收藏。</p>
+<p>卡片按钮、双击和桌面快捷方式共用CreateLaunchRequest：新窗口采用当前设置，已有窗口沿用原Request并切回，不因更改默认模式强制关窗。右键删除相机入口，只保留快捷方式。开关对新窗口生效；帧率通过宿主原子更新活跃或启动中的会话，后续周期按1000/目标fps调度并重置统计，暂停不会被修改帧率解除。</p>
+<p>NumberBox初始化受ready门控，不会覆盖加载设置；限制1–30、整数取整、空值失焦恢复；窗口退出时禁止修改设置。单相机会话、600/615秒期限、1440×2560尺寸、原生拖动重绘与精准清理边界保持不变。发布out/desktop-camera-settings，只编译打包及静态审查，不执行测试、不自动操作手机。</p>
+<p>设置版本交付检查：完整WinUI Release发布成功，包含新XAML资源索引与设置/相机程序集；必需文件齐全，内置运行时19个文件SHA256匹配，六个配套特性齐全且无已撤回SF特性，用户指南与计划副本一致，git diff --check通过。独立静态审查未发现明确Critical/Important。未运行程序或测试，旧设置迁移、开关保存恢复、快捷方式采用默认模式、运行中调帧率与控件输入均待用户手动确认。</p>
+</html>

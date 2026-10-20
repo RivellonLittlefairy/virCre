@@ -2,7 +2,8 @@ using System.Text.Json;
 
 namespace VirCre.Launcher;
 
-public sealed record UserSettings(string[] Favorites, string Theme = "System", int Version = 1);
+public sealed record UserSettings(string[] Favorites, string Theme = "System", int Version = 1,
+    bool VirtualCameraEnabled = true, int CameraFrameRate = CameraFrameRates.Default);
 public sealed record SettingsLoad(UserSettings Settings, string? Warning = null);
 
 /// <summary>Per-user, atomically replaced settings. A failed read never overwrites the damaged file.</summary>
@@ -37,5 +38,6 @@ public sealed class SettingsStore(string path) {
     }
     private static UserSettings Normalize(UserSettings data) => new(
         data.Favorites.Where(p => !string.IsNullOrWhiteSpace(p) && p.Length <= 255).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
-        data.Theme is "Dark" or "Light" ? data.Theme : "System");
+        data.Theme is "Dark" or "Light" ? data.Theme : "System",VirtualCameraEnabled:data.VirtualCameraEnabled,
+        CameraFrameRate:CameraFrameRates.Normalize(data.CameraFrameRate));
 }

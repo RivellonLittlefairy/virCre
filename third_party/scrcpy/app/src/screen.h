@@ -39,6 +39,7 @@ struct sc_screen {
     bool camera;
     bool window_aspect_ratio_lock;
     bool flex_display;
+    bool virtual_camera;
 
     struct sc_controller *controller;
 
@@ -55,6 +56,8 @@ struct sc_screen {
 
     struct sc_mutex mutex;
     struct sc_frame_buffer fb; // protected by mutex
+    // A live-move redraw may consume fb while the queued notification is still pending.
+    bool frame_event_pending; // protected by mutex
     // When true, a frame size change must not cause the window to be resized
     bool prevent_auto_resize; // protected by mutex
 
@@ -92,6 +95,10 @@ struct sc_screen {
     // rectangle of the content (excluding black borders)
     struct SDL_FRect rect;
     bool window_shown;
+#ifdef _WIN32
+    bool live_move_rendering; // UI thread only; guards modal-loop reentrancy
+    sc_tick live_move_last_render; // UI thread only; bounds modal redraw frequency
+#endif
 
     // only accessed from the thread calling sc_frame_sink_ops functions
     struct sc_stream_session current_session;
@@ -120,6 +127,7 @@ struct sc_screen_params {
     bool video;
     bool camera;
     bool flex_display;
+    bool virtual_camera;
 
     struct sc_controller *controller;
     struct sc_file_pusher *fp;
@@ -131,6 +139,7 @@ struct sc_screen_params {
     bool legacy_paste;
     bool clipboard_autosync;
     bool windows_ime;
+    bool window_exclude_from_capture;
     uint8_t shortcut_mods; // OR of enum sc_shortcut_mod values
 
     const char *window_title;

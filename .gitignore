@@ -1,11 +1,36 @@
+# Local IDE and agent workspace state
 .gradle/
 .idea/
+.vs/
 .cache/
 .superpowers/
-**/build/
-local.properties
-out/
 *.iml
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Generated build, publish and test output
+**/build/
+out/
 **/.kotlin/
 **/bin/
 **/obj/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Machine settings, portable user data and temporary files
+local.properties
+virCre-data/
+*.tmp
+*.bak
+*.log
+
+# Local review notes; maintained project documentation is HTML
+/docs/code-review-*.md
+
+# Private code-signing material
+*.pfx
+*.p12

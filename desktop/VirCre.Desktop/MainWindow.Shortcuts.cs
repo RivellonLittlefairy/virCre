@@ -6,21 +6,34 @@ using VirCre.Presentation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
+    private bool shortcutOnly;
+    private int pendingShortcutActivations;
     private Task shortcutTask=Task.CompletedTask;
     private readonly List<Task> shortcutWrites=[];
     public void ActivateShortcut(string? payload) {
         if(windowShutdown.HasStarted) {
-            if(!closing) {Activate();ShowAction("正在结束会话，请先关闭剩余应用窗口。",true);}
+            if(!closing) {ShowLauncher();ShowAction("正在结束会话，请先关闭剩余应用窗口。",true);}
             return;
         }
+        if(payload==null) {ShowLauncher();return;}
+        pendingShortcutActivations++;
+        shortcutTask=OpenShortcutAfterAsync(shortcutTask,payload);
+    }
+    private void ShowLauncher() {
+        shortcutOnly=false;
         Activate();
-        if(payload!=null) shortcutTask=OpenShortcutAfterAsync(shortcutTask,payload);
+    }
+    private void CloseIdleShortcutSession() {
+        if(!shortcutOnly || closing || windowShutdown.HasStarted || pendingShortcutActivations!=0 || appWindows.Windows.Count!=0)return;
+        RuntimeDiagnostics.Write("shortcut-session-ended");
+        Close();
     }
     private async Task OpenShortcutAfterAsync(Task previous, string payload) {
-        await previous;
-        if(closing || windowShutdown.HasStarted) return;
         try {
+            await previous;
+            if(closing || windowShutdown.HasStarted) return;
             var request=ShortcutRequest.Decode(payload);
+            RuntimeDiagnostics.Write("shortcut-launch",details:shortcutOnly?"background":"launcher");
             ShowAction($"正在连接 {request.DeviceName}，打开 {request.Name}…");
             var runner=new CommandRunner();
             var directory=new PhoneCatalog(runner);
@@ -28,10 +41,16 @@ public sealed partial class MainWindow {
             var device=await request.ResolveAsync(devices,(s,t)=>ShortcutRequest.GetHardwareIdAsync(runner,s,t),lifetime.Token);
             if(!await directory.CanLaunchAsync(device.Serial,request.PackageName,lifetime.Token))
                 throw new IOException("手机中已找不到此应用的启动入口，请刷新列表并重新创建快捷方式。");
-            var result=await appWindows.OpenAsync(new(device.Serial,device.Model,request.PackageName,request.Name),lifetime.Token);
+            var result=await appWindows.OpenAsync(CreateLaunchRequest(device.Serial,device.Model,request.PackageName,request.Name),lifetime.Token);
+            RuntimeDiagnostics.Write("shortcut-opened",details:result.Reused?"existing-window":"new-window");
             ShowAction(result.Activated?$"已打开 {request.Name}。":$"{request.Name} 窗口已存在，请从任务栏切回。");
         } catch(OperationCanceledException) { }
-        catch(Exception error) {ShowAction("快捷方式启动失败："+error.Message,true);}
+        catch(Exception error) {RuntimeDiagnostics.Write("shortcut-launch-failed",error);ShowAction("快捷方式启动失败："+error.Message,true);}
+        finally {
+            pendingShortcutActivations--;
+            // Queue cleanup after this activation task completes; shutdown waits for shortcutTask.
+            DispatcherQueue.TryEnqueue(CloseIdleShortcutSession);
+        }
     }
     private Task<ShortcutCreation> PrepareShortcutAsync(AppCard card, string directory,bool desktop=false) {
         shortcutWrites.RemoveAll(t=>t.IsCompleted);

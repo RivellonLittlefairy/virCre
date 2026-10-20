@@ -63,7 +63,7 @@ public sealed partial class MainWindow {
             } finally {finished.SetResult();}
         } catch(Exception error) {RuntimeDiagnostics.Write("shortcut-drag-failed",error);ShowAction("拖出快捷方式失败："+error.Message,true);}
         finally {
-            dragOwnership.Release(gesture.Ticket,()=>{dragGesture=null;if(!closing)source.ReleasePointerCaptures();});
+            dragOwnership.Release(gesture.Ticket,()=>{dragGesture=null;source.ReleasePointerCaptures();});
         }
     }
 }

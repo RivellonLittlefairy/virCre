@@ -342,6 +342,10 @@ execute_server(struct sc_server *server,
     if (params->display_id) {
         ADD_PARAM("display_id=%" PRIu32, params->display_id);
     }
+    if (params->vircre_camera) {
+        VALIDATE_STRING(params->vircre_camera);
+        ADD_PARAM("vircre_camera=%s", params->vircre_camera);
+    }
     if (params->camera_id) {
         VALIDATE_STRING(params->camera_id);
         ADD_PARAM("camera_id=%s", params->camera_id);

@@ -35,7 +35,7 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
         if (result.ExitCode != 0) throw new IOException($"{operation}读取失败（退出码 {result.ExitCode}），请检查设备授权与连接后刷新。");
     }
     public static IReadOnlyList<PhoneDevice> ParseDevices(string text) {
-        if (!text.Contains("List of devices attached", StringComparison.Ordinal)) throw new InvalidDataException("设备列表格式无效，请检查 adb 版本。");
+        if (!text.Contains("List of devices attached", StringComparison.Ordinal)) throw CatalogErrors.Format("设备列表格式无效，请检查 adb 版本。");
         var devices = new List<PhoneDevice>();
         foreach (var line in text.Split('\n')) {
             var parts = line.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -48,7 +48,7 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
         return devices.DistinctBy(device => device.Serial).ToArray();
     }
     public static IReadOnlyList<PhoneApp> ParseApps(string text) {
-        if (!text.Contains("List of apps:", StringComparison.Ordinal)) throw new InvalidDataException("没有收到完整应用列表，请检查 scrcpy 版本与手机连接。");
+        if (!text.Contains("List of apps:", StringComparison.Ordinal)) throw CatalogErrors.Format("没有收到完整应用列表，请检查 scrcpy 版本与手机连接。");
         var apps = new Dictionary<string, PhoneApp>(StringComparer.Ordinal);
         var inList = false;
         foreach (var line in text.Split('\n')) {
@@ -57,7 +57,7 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
             var trimmed = line.Trim();
             if (!(trimmed.StartsWith("* ", StringComparison.Ordinal) || trimmed.StartsWith("- ", StringComparison.Ordinal))) continue;
             var match = AppPattern().Match(trimmed);
-            if (!match.Success) throw new InvalidDataException("应用列表包含无法识别的条目，请刷新重试。");
+            if (!match.Success) throw CatalogErrors.Format("应用列表包含无法识别的条目，请刷新重试。");
             var package = match.Groups["package"].Value;
             apps.TryAdd(package, new(match.Groups["name"].Value.Trim(), package, match.Groups["kind"].Value == "*"));
         }

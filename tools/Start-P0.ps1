@@ -16,7 +16,7 @@ $script:CleaningUp=$false
 . (Join-Path $PSScriptRoot 'Evidence.ps1')
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $apk = Join-Path $repoRoot 'android\app\build\outputs\apk\debug\app-debug.apk'
-if (-not (Test-Path -LiteralPath $apk)) { throw 'Build APK first with tools/Build.ps1' }
+if (-not (Test-Path -LiteralPath $apk)) { throw 'The Android probe APK project has been retired. Use tools/Start-Desktop.ps1 and enable the virtual camera in Settings.' }
 $identity = Assert-P0Device
 $session = [Guid]::NewGuid().ToString('N')
 $sessionDir = Join-Path $repoRoot "out\$session"

@@ -10,6 +10,7 @@
             <FontFamily x:Key="XamlAutoFontFamily">Microsoft YaHei UI</FontFamily>
             <local:ColorBrushConverter x:Key="ColorBrush" />
             <local:IconConverter x:Key="AppIcon" />
+            <local:BoolVisibilityConverter x:Key="BoolVisibility" />
             <Style x:Key="SectionHint" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="FontSize" Value="13" />

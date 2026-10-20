@@ -70,7 +70,11 @@ try {
     if($LASTEXITCODE -ne 0) {throw 'Clipboard AIDL compilation failed'}
     & $aidl ('-o'+$generated) ('-I'+$aidlSource) '-p' $frameworkAidl (Join-Path $aidlSource 'android\view\IDisplayWindowListener.aidl')
     if($LASTEXITCODE -ne 0) {throw 'Display AIDL compilation failed'}
+    $cameraSourceRoot=Join-Path $repoDirectory 'camera-agent\src\main\java\com\example\vircam'
+    $cameraSources=@(Get-ChildItem -LiteralPath (Join-Path $cameraSourceRoot 'shell') -Filter '*.java')
+    foreach($cameraCore in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java')) {$cameraSources+=Get-Item -LiteralPath (Join-Path $cameraSourceRoot "core\$cameraCore")}
     $javaSources=@(Get-ChildItem -LiteralPath (Join-Path $sourceDirectory 'server\src\main\java'),$generated -Filter '*.java' -Recurse | ForEach-Object {'"'+$_.FullName.Replace('\','/')+'"'})
+    $javaSources+=@($cameraSources | ForEach-Object {'"'+$_.FullName.Replace('\','/')+'"'})
     $javaArgs=Join-Path $serverBuild 'javac.args'
     $javaSources | Set-Content -LiteralPath $javaArgs -Encoding utf8
     & (Join-Path $Java 'bin\javac.exe') -encoding UTF-8 -source 8 -target 8 -Xlint:-options -bootclasspath $androidJar -classpath ($lambdaJar+';'+$generated) -d $classes ('@'+$javaArgs)
@@ -95,9 +99,12 @@ try {
     $sourceHashes=@(Get-ChildItem -LiteralPath $sourceDirectory -File -Recurse | Sort-Object FullName | ForEach-Object {
         [IO.Path]::GetRelativePath($sourceDirectory,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
     })
+    $sourceHashes+=@($cameraSources | Sort-Object FullName | ForEach-Object {
+        [IO.Path]::GetRelativePath($repoDirectory,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    })
     $sourceFingerprint=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
     $officialRecord=Get-Content -LiteralPath (Join-Path $officialDirectory 'runtime-manifest.json') -Raw | ConvertFrom-Json
-    [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
+    [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1','window-capture-exclusion-v1','vdm-direct-encoder-v1','camera-hd-jpeg-v1','camera-display-size-v1','camera-live-move-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
 } finally {
     foreach($name in $previousEnvironment.Keys) {[Environment]::SetEnvironmentVariable($name,$previousEnvironment[$name])}
 }

@@ -20,10 +20,10 @@ public partial class App : Application {
             await instance.RedirectActivationToAsync(AppInstance.GetCurrent().GetActivatedEventArgs());
             Exit();return;
         }
-        window = new MainWindow();
+        var shortcut=ActivationArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray());
+        window = new MainWindow(shortcutOnly:shortcut!=null);
         instance.Activated+=(_,activation)=>window.DispatcherQueue.TryEnqueue(()=>window.ActivateShortcut(
             activation.Data is ILaunchActivatedEventArgs launch?ActivationArguments.ParseCommandLine(launch.Arguments):null));
-        window.Activate();
-        window.ActivateShortcut(ActivationArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray()));
+        window.ActivateShortcut(shortcut);
     }
 }

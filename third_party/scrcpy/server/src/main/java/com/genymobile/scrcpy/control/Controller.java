@@ -36,6 +36,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.File;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -105,17 +107,23 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
     private final Object displayDataAvailable = new Object(); // condition variable
 
     private long lastTouchDown;
+    private final boolean touchDiagnostics;
+    private final Set<String> reportedTouchStages = new HashSet<>();
     private final PointersState pointersState = new PointersState();
     private final MotionEvent.PointerProperties[] pointerProperties = new MotionEvent.PointerProperties[PointersState.MAX_POINTERS];
     private final MotionEvent.PointerCoords[] pointerCoords = new MotionEvent.PointerCoords[PointersState.MAX_POINTERS];
 
     private boolean keepDisplayPowerOff;
+    // Only opt in after an explicit panel-off command. Never wake a user-locked phone.
+    private final Object mainDisplayActivityLock = new Object();
+    private boolean keepMainDisplayActive;
 
     // Used for resetting video encoding on RESET_VIDEO message or for sending camera controls
     private SurfaceCapture surfaceCapture;
 
     public Controller(ControlChannel controlChannel, CleanUp cleanUp, Options options) {
         this.camera = options.getVideoSource() == VideoSource.CAMERA;
+        this.touchDiagnostics = options.getNewDisplay() != null;
         this.controlChannel = controlChannel;
         this.cleanUp = cleanUp;
 
@@ -257,6 +265,17 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                     int actionDisplayId = getActionDisplayId();
                     if (actionDisplayId != Device.DISPLAY_ID_NONE) {
                         Device.keepActive(actionDisplayId);
+                    }
+                    synchronized (mainDisplayActivityLock) {
+                        if (keepMainDisplayActive) {
+                            if (Device.isScreenOn(0)) {
+                                Device.keepActive(0);
+                            } else {
+                                // Stop after observing an intentional sleep, including across a later user wake.
+                                keepMainDisplayActive = false;
+                                Ln.i("VirCre power stage: power-main-asleep");
+                            }
+                        }
                     }
                 }
             } catch (InterruptedException e) {
@@ -504,6 +523,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         if (displayData != null) {
             point = displayData.positionMapper.map(position);
             if (point == null) {
+                reportTouchStage("touch-size-mismatch");
                 if (Ln.isEnabled(Ln.Level.VERBOSE)) {
                     Size eventSize = position.getScreenSize();
                     Size currentSize = displayData.positionMapper.getVideoSize();
@@ -534,6 +554,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
 
         int pointerIndex = pointersState.getPointerIndex(pointerId);
         if (pointerIndex == -1) {
+            reportTouchStage("touch-pointer-limit");
             Ln.w("Too many pointers for touch event");
             return false;
         }
@@ -629,7 +650,26 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
 
         MotionEvent event = MotionEvent.obtain(lastTouchDown, now, action, pointerCount, pointerProperties, pointerCoords, 0, buttons, 1f, 1f,
                 DEFAULT_DEVICE_ID, 0, source, 0);
-        return Device.injectEvent(event, targetDisplayId, Device.INJECT_MODE_ASYNC);
+        boolean accepted = Device.injectEvent(event, targetDisplayId, Device.INJECT_MODE_ASYNC);
+        if (!accepted) {
+            reportTouchStage("touch-inject-rejected");
+        } else if (source == InputDevice.SOURCE_TOUCHSCREEN && pointerCount == 1) {
+            if (action == MotionEvent.ACTION_DOWN) {
+                reportTouchStage("touch-down-accepted");
+            } else if (action == MotionEvent.ACTION_UP) {
+                long elapsed = now - lastTouchDown;
+                reportTouchStage(elapsed == 0 ? "touch-up-zero" : elapsed < 40 ? "touch-up-short"
+                        : elapsed < 500 ? "touch-up-normal" : "touch-up-long");
+            }
+        }
+        return accepted;
+    }
+
+    private void reportTouchStage(String stage) {
+        // Once per fixed stage/session. No coordinates, target views, text or individual event timestamps.
+        if (touchDiagnostics && reportedTouchStages.add(stage)) {
+            Ln.i("VirCre touch stage: " + stage);
+        }
     }
 
     private boolean injectScroll(Position position, float hScroll, float vScroll, int buttons) {
@@ -915,6 +955,22 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         int targetDisplayId = displayId != Device.DISPLAY_ID_NONE ? displayId : 0;
         boolean setDisplayPowerOk = Device.setDisplayPower(targetDisplayId, on);
         if (setDisplayPowerOk) {
+            if (displayId == Device.DISPLAY_ID_NONE) {
+                // The virtual display has its own power group. When the user explicitly turns
+                // off only the physical panel, keep its logical interactive state alive too.
+                // userActivity() does not wake an already sleeping display or dismiss keyguard.
+                synchronized (mainDisplayActivityLock) {
+                    keepMainDisplayActive = keepActive && !on && Device.isScreenOn(0);
+                    if (keepMainDisplayActive) {
+                        Device.keepActive(0);
+                        Ln.i("VirCre power stage: power-main-activity-enabled");
+                    } else if (!on && !Device.isScreenOn(0)) {
+                        Ln.i("VirCre power stage: power-main-asleep");
+                    } else if (on) {
+                        Ln.i("VirCre power stage: power-panel-restored");
+                    }
+                }
+            }
             // Do not keep display power off for virtual displays: MOD+p must wake up the physical device
             keepDisplayPowerOff = displayId != Device.DISPLAY_ID_NONE && !on;
             Ln.i("Device display turned " + (on ? "on" : "off"));

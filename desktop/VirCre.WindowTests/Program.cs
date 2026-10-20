@@ -4,8 +4,9 @@ try {
 var request = new AppLaunchRequest("phone", "Phone", "com.android.settings", "设置");
 Check(ScrcpyWindowHost.ParseDisplayId("[server] INFO: New display: 1080x1920/420 (id=39)")==39,"display ID parsing never mistakes width for ID");
 var arguments = ScrcpyWindowHost.Arguments(request);
-Check(arguments.Contains("phone") && arguments.Contains("--start-app=com.android.settings") && arguments.Contains("--new-display=1440x2560/480") && !arguments.Any(a=>a.Contains("--start-app=+")), "exact device, package and larger new display without force-stop");
-Check(arguments.Contains("--window-width=720") && arguments.Contains("--window-height=1280"),"app windows start at a larger 720 by 1280 size");
+Check(arguments.Contains("phone") && arguments.Contains("--start-app=com.android.settings") && arguments.Contains("--new-display") && !arguments.Any(a=>a.StartsWith("--new-display=",StringComparison.Ordinal) || a.Contains("--start-app=+")), "exact device and package with phone display size and DPI, without force-stop");
+Check(!arguments.Any(a=>a.StartsWith("--window-width=",StringComparison.Ordinal) || a.StartsWith("--window-height=",StringComparison.Ordinal)),"app windows fit the PC work area while preserving the phone aspect ratio");
+Check(arguments.Contains("--keep-active") && !arguments.Contains("--stay-awake") && !arguments.Contains("--turn-screen-off"),"virtual displays stay active without changing global sleep settings or automatically powering off the phone panel");
 try {ScrcpyWindowHost.Arguments(request with {PackageName="+com.bad"});throw new Exception("Invalid package accepted");}catch(ArgumentException){}
 var host = new FakeHost();
 var manager = new AppWindowManager(host);

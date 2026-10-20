@@ -1,4 +1,5 @@
 using Microsoft.UI.Windowing;
+using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VirCre.Presentation;
@@ -15,7 +16,13 @@ public sealed partial class MainWindow : Window {
     private bool allowClose;
     private readonly ShutdownCoordinator windowShutdown=new();
 
-    public MainWindow() {
+    public MainWindow(bool shortcutOnly=false) {
+        this.shortcutOnly=shortcutOnly;
+        windowHost=new(stage=>RuntimeDiagnostics.Write(stage.StartsWith("touch-",StringComparison.Ordinal)?"touch-stage":stage.StartsWith("power-",StringComparison.Ordinal)?"power-stage":"input-rejected",details:stage),message=>{
+            RuntimeDiagnostics.Write("virtual-camera",details:message);
+            DispatcherQueue.TryEnqueue(()=>ShowAction(message));
+        },stage=>RuntimeDiagnostics.Write("camera-stage",details:stage));
+        appWindows=new(windowHost,observerFailure:error=>RuntimeDiagnostics.Write("window-observer-failed",error));
         var settings = LoadSettings();
         RuntimeDiagnostics.Write("startup",details:DataDirectory);
         model = new(settings: settings.Settings);
@@ -28,6 +35,10 @@ public sealed partial class MainWindow : Window {
         AppGrid.ItemsSource = model.Apps;
         RunningList.ItemsSource = model.Running;
         ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
+        VirtualCameraToggle.IsOn=model.VirtualCameraEnabled;
+        CameraFrameRateBox.Value=model.CameraFrameRate;
+        var appVersion=typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]??"0.1.1";
+        AboutVersion.Text="virCre "+appVersion;
         Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
         model.SettingsChanged += SaveSettings;
         phone.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
@@ -66,9 +77,11 @@ public sealed partial class MainWindow : Window {
                 new("native-drag",()=>nativeDragTask),new("shortcut-writes",()=>Task.WhenAll(shortcutWrites.ToArray()))],
                 appWindows.StopAsync,()=>appWindows.Windows.Count>0,
                 enabled=>{Root.IsHitTestVisible=enabled;Navigation.IsEnabled=enabled;});
-            foreach(var failure in result.Failures)RuntimeDiagnostics.Write("shutdown-work-failed",failure.Error,failure.Name);
+            foreach(var failure in result.Failures)RuntimeDiagnostics.Write(failure.Error is TimeoutException?"shutdown-timeout":"shutdown-work-failed",failure.Error,failure.Name);
             if(!result.CanClose) {
-                RestoreCleanupControls("仍有应用窗口未关闭，请在运行中页面重试关闭窗口，再关闭主界面。");
+                RestoreCleanupControls(result.Failures.Any(failure=>failure.Error is TimeoutException)
+                    ?"收尾等待超过15秒，界面已恢复；后台任务仍在结束，请稍后重试关闭。剩余应用窗口可在运行中页面关闭。"
+                    :"仍有应用窗口未关闭，请在运行中页面重试关闭窗口，再关闭主界面。");
                 return;
             }
         }
@@ -166,6 +179,7 @@ public sealed partial class MainWindow : Window {
         DevicePicker.IsEnabled=!cleanupOnly && !scanning;
         RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
         AppGrid.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading && model.HasDevice;ThemeChoice.IsEnabled=!cleanupOnly;
+        VirtualCameraToggle.IsEnabled=!cleanupOnly;CameraFrameRateBox.IsEnabled=!cleanupOnly;
         foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
         if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;

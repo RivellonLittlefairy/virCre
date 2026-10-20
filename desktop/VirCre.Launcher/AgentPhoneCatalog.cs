@@ -22,22 +22,22 @@ public sealed class AgentPhoneCatalog(IPhoneCatalog devices, ICommandRunner runn
         }
     }
     private async Task<IReadOnlyList<PhoneApp>> ParseAsync(string output, CancellationToken token) {
-        if (output.Length > 32 * 1024 * 1024) throw new InvalidDataException("应用列表数据过大。");
+        if (output.Length > 32 * 1024 * 1024) throw CatalogErrors.Format("应用列表数据过大。");
         var apps = new Dictionary<string, PhoneApp>(StringComparer.Ordinal);
         var complete = false;
         var iconFailures = 0;
         try {
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
                 token.ThrowIfCancellationRequested();
-                if (complete) throw new InvalidDataException("应用列表结束后仍有数据。");
+                if (complete) throw CatalogErrors.Format("应用列表结束后仍有数据。");
                 using var json = JsonDocument.Parse(line);
                 var item = json.RootElement;
                 if (item.GetProperty("type").GetString() == "complete") {complete = true; continue;}
-                if (item.GetProperty("type").GetString() != "app" || apps.Count >= 5000) throw new InvalidDataException("应用条目无效。");
+                if (item.GetProperty("type").GetString() != "app" || apps.Count >= 5000) throw CatalogErrors.Format("应用条目无效。");
                 var package = item.GetProperty("package").GetString()!;
                 var name = item.GetProperty("name").GetString()!;
                 _ = new ShortcutRequest("device", "", "device", package, name).Encode();
-                if (apps.ContainsKey(package)) throw new InvalidDataException("应用列表包名重复。");
+                if (apps.ContainsKey(package)) throw CatalogErrors.Format("应用列表包名重复。");
                 string? icon = null;
                 if (item.TryGetProperty("png", out var encoded)) {
                     try {
@@ -49,9 +49,9 @@ public sealed class AgentPhoneCatalog(IPhoneCatalog devices, ICommandRunner runn
                 apps.Add(package, new(name, package, item.GetProperty("system").GetBoolean(), icon));
             }
         } catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException or FormatException) {
-            throw new InvalidDataException("手机应用列表格式异常，请刷新重试。", error);
+            throw CatalogErrors.Format("手机应用列表格式异常，请刷新重试。", error);
         }
-        if (!complete) throw new InvalidDataException("应用列表传输未完成，保留原缓存。");
+        if (!complete) throw CatalogErrors.Format("应用列表传输未完成，保留原缓存。");
         if (iconFailures > 0) Warning?.Invoke($"{iconFailures} 个图标暂不可用，其余应用正常显示。");
         return apps.Values.OrderBy(app => app.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(app => app.PackageName, StringComparer.Ordinal).ToArray();
     }

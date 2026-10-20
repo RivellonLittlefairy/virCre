@@ -1,4 +1,6 @@
 using VirCre.Launcher;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace VirCre.Desktop;
 
@@ -10,6 +12,21 @@ public sealed partial class MainWindow {
     internal static readonly string ShortcutDataDirectory=Path.Combine(PreferredDataDirectory,"shell");
     private readonly SettingsStore settingsStore=new(Path.Combine(DataDirectory,"settings.json"));
     private Task settingsTask=Task.CompletedTask;
+    private void VirtualCamera_Toggled(object sender,RoutedEventArgs args) {
+        if(!ready || windowShutdown.HasStarted)return;
+        model.SetVirtualCameraEnabled(VirtualCameraToggle.IsOn);
+    }
+    private void CameraFrameRate_ValueChanged(NumberBox sender,NumberBoxValueChangedEventArgs args) {
+        if(!ready || windowShutdown.HasStarted || !double.IsFinite(args.NewValue))return;
+        int frameRate=(int)Math.Clamp(Math.Round(args.NewValue,MidpointRounding.AwayFromZero),CameraFrameRates.Minimum,CameraFrameRates.Maximum);
+        if(sender.Value!=frameRate)sender.Value=frameRate;
+        windowHost.SetTargetFrameRate(frameRate);
+        model.SetCameraFrameRate(frameRate);
+    }
+    private void CameraFrameRate_LostFocus(object sender,RoutedEventArgs args) {
+        if(!ready || windowShutdown.HasStarted)return;
+        if(!double.IsFinite(CameraFrameRateBox.Value))CameraFrameRateBox.Value=model.CameraFrameRate;
+    }
     private SettingsLoad LoadSettings() {
         if(StorageLocation.UsedFallback && !File.Exists(Path.Combine(DataDirectory,"settings.json")))
             return new SettingsStore(Path.Combine(PreferredDataDirectory,"settings.json")).Load();
