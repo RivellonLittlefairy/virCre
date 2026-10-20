@@ -168,7 +168,7 @@
                                         <NumberBox x:Name="CameraFrameRateBox" Header="桌面相机目标帧率（fps）" Minimum="1" Maximum="30" Value="15" SmallChange="1" LargeChange="5"
                                                    SpinButtonPlacementMode="Inline" Width="220" HorizontalAlignment="Left" ValueChanged="CameraFrameRate_ValueChanged" LostFocus="CameraFrameRate_LostFocus" />
                                         <TextBlock Text="1–30fps，默认15fps。帧率修改会应用到正在运行的相机会话；实际帧率取决于电脑、手机与连接性能。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="实验版同时仅支持一个相机窗口，每次最长10分钟。需要同时打开其他普通窗口时，可先关闭此开关。" Style="{StaticResource SectionHint}" />
+                                        <TextBlock Text="实验版同时仅支持一个相机窗口，正常运行没有时长上限。需要同时打开其他普通窗口时，可先关闭此开关。" Style="{StaticResource SectionHint}" />
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">

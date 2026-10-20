@@ -93,8 +93,17 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
                     stage=stopReason.GetString() switch {
                         "quit-event"=>"client-quit-event", "quit-shortcut"=>"client-quit-shortcut",
                         "native-close"=>"client-native-close", "native-system-close"=>"client-native-system-close",
+                        "native-alt-f4"=>"client-native-alt-f4", "native-close-button"=>"client-native-close-button",
                         "time-limit"=>"client-time-limit", "device-disconnected"=>"client-device-disconnected", _=>null
                     };
+                    if(stage=="client-native-system-close") {
+                        if(root.TryGetProperty("delivery",out var delivery) && delivery.GetString() is "cross-thread-send" or "local-or-posted")
+                            stage+=" delivery="+delivery.GetString();
+                        if(root.TryGetProperty("idle",out var idle) && idle.GetString() is "under-one-second" or "under-ten-seconds" or "over-ten-seconds" or "unknown")
+                            stage+=" idle="+idle.GetString();
+                        if(root.TryGetProperty("foreground",out var foreground) && foreground.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                            stage+=" foreground="+(foreground.GetBoolean()?"true":"false");
+                    }
                 }
                 if(kind.GetString()=="server-processor-ended" && root.TryGetProperty("processor",out var processor)) {
                     stage=processor.GetString() switch {

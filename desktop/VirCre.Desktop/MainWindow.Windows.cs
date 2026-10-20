@@ -50,7 +50,7 @@ public sealed partial class MainWindow {
         ShowAction($"正在打开 {card.Name}…");
         try {
             var result = await appWindows.OpenAsync(CreateLaunchRequest(device.Serial, device.Model, card.PackageName, card.Name), lifetime.Token);
-            ShowAction(result.Window.IsVirtualCamera ? $"{card.Name} 已以虚拟摄像头模式打开。采集窗口盖住的桌面；设置中可调整帧率或关闭默认相机。实验版每次最长10分钟。" :
+            ShowAction(result.Window.IsVirtualCamera ? $"{card.Name} 已以虚拟摄像头模式打开。采集窗口盖住的桌面；设置中可调整帧率或关闭默认相机。" :
                 result.Activated ? result.Reused ? $"已切回 {card.Name}。" : $"{card.Name} 的独立窗口已打开。" : $"{card.Name} 窗口已存在，请从任务栏切回。");
         } catch (OperationCanceledException) { if (!closing) ShowAction("应用启动已取消。"); }
         catch (Exception error) { ShowAction("打开失败：" + error.Message, true); }
