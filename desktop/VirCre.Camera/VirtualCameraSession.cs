@@ -95,6 +95,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
         int sampleRate=Volatile.Read(ref targetFrameRate);
         long sampleStart=Stopwatch.GetTimestamp(),sampleBytes=0;
         int sampleFrames=0;
+        bool recovering=false;
         try {
             while(!token.IsCancellationRequested && window is {HasExited:false}) {
                 long frameStart=Stopwatch.GetTimestamp();
@@ -119,9 +120,23 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
                 }
                 byte[]? image;
                 try {
-                    capture??=new(CaptureNative.GetRegion(NativeHandle),inputWidth,inputHeight);
+                    capture??=new(inputWidth,inputHeight);
                     image=await capture.CaptureAsync(NativeHandle,token).ConfigureAwait(false);
                 } catch(OperationCanceledException) {throw;}
+                catch(Exception e) when(e is IOException or System.Runtime.InteropServices.COMException or ObjectDisposedException) {
+                    capture?.Dispose();capture=null;
+                    var previousStatus=Volatile.Read(ref status);
+                    if(Volatile.Read(ref paused)!=0 || Volatile.Read(ref resumeVersion)!=version)continue;
+                    // A manual pause/resume published during error handling owns its
+                    // status. Never replace that newer state with an automatic retry.
+                    var retryStatus=new CameraStatus(true,"正在等待自动恢复："+e.Message);
+                    if(!ReferenceEquals(Interlocked.CompareExchange(ref status,retryStatus,previousStatus),previousStatus))continue;
+                    Volatile.Write(ref transferStatus,$"{inputWidth}×{inputHeight} · 等待采集恢复");
+                    if(!recovering) {recovering=true;phone.RecordStage("desktop-capture-recovering");notice?.Invoke("虚拟摄像头暂时无法采集，将自动恢复："+e.Message);}
+                    await frames!.PauseAsync(token).ConfigureAwait(false);
+                    await Task.Delay(500,token).ConfigureAwait(false);
+                    continue;
+                }
                 catch(Exception e) {
                     capture?.Dispose();capture=null;
                     Interlocked.Exchange(ref paused,1);
@@ -134,6 +149,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
                 if(image==null)await frames!.PauseAsync(token).ConfigureAwait(false);
                 else {
                     await frames!.SendFrameAsync(image,DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),token).ConfigureAwait(false);
+                    if(recovering) {recovering=false;phone.RecordStage("desktop-capture-recovered");}
                     sampleFrames++;sampleBytes+=image.Length;
                     double seconds=Stopwatch.GetElapsedTime(sampleStart).TotalSeconds;
                     if(seconds>=2) {

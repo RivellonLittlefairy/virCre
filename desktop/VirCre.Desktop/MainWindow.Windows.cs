@@ -68,7 +68,7 @@ public sealed partial class MainWindow {
         var entry=appWindows.Windows.FirstOrDefault(value=>value.Id==id);
         if(entry is not {IsVirtualCamera:true})return;
         var state=windowHost.GetStatus(entry.Request);
-        var content=new TextBlock {Text=state.Message+"\n\n画面来自此投屏窗口客户区盖住的桌面，不包含投屏窗口自身。请将窗口完整放在一个显示器内。关闭应用窗口后停止采集。",TextWrapping=TextWrapping.Wrap};
+        var content=new TextBlock {Text=state.Message+"\n\n画面来自此投屏窗口客户区盖住的桌面，不包含投屏窗口自身。跨屏时自动拼接各屏幕画面，超出屏幕的部分补黑。最小化或锁屏期间暂停发送，还原或解锁后自动恢复；手动暂停需手动继续。关闭应用窗口后停止采集。",TextWrapping=TextWrapping.Wrap};
         var dialog=new ContentDialog {
             XamlRoot=Root.XamlRoot,Title="虚拟摄像头 · "+entry.Name,Content=content,
             PrimaryButtonText=state.Paused?"继续采集":"暂停采集",CloseButtonText="返回"

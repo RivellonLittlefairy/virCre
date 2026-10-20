@@ -8,7 +8,14 @@ internal static class CaptureNative {
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left,Top,Right,Bottom; public readonly int Width=>Right-Left; public readonly int Height=>Bottom-Top; }
     [StructLayout(LayoutKind.Sequential)] private struct Point { public int X,Y; }
     [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public int Size; public Rect Monitor,Work; public uint Flags; }
-    internal readonly record struct Region(IntPtr Monitor,Rect MonitorBounds,Rect ClientBounds);
+    internal readonly record struct MonitorRegion(IntPtr Handle,Rect Bounds);
+    internal readonly record struct Region(Rect ClientBounds,IReadOnlyList<MonitorRegion> Monitors);
+    private delegate bool MonitorCallback(IntPtr monitor,IntPtr dc,ref Rect bounds,IntPtr data);
+
+    internal static Rect Intersect(Rect left,Rect right)=>new() {
+        Left=Math.Max(left.Left,right.Left),Top=Math.Max(left.Top,right.Top),
+        Right=Math.Min(left.Right,right.Right),Bottom=Math.Min(left.Bottom,right.Bottom)
+    };
 
     internal static Region GetRegion(IntPtr window) {
         // WinUI is DPI aware, but the pump runs on pool threads: use physical coordinates explicitly.
@@ -16,34 +23,39 @@ internal static class CaptureNative {
         try {
             RequireInputDesktop();
             if(window==IntPtr.Zero || !IsWindow(window) || !IsWindowVisible(window) || IsIconic(window))
-                throw new IOException("投屏窗口不可见或已最小化。还原窗口后点击继续。");
+                throw new IOException("投屏窗口不可见或已最小化，还原窗口后自动恢复。");
             if(DwmGetWindowAttribute(window,14,out var cloaked,sizeof(int))!=0 || cloaked!=0)
-                throw new IOException("投屏窗口不在当前可见的 Windows 桌面，请切回后点击继续。");
+                throw new IOException("投屏窗口不在当前可见的 Windows 桌面，切回后自动恢复。");
             if(!GetWindowDisplayAffinity(window,out var affinity) || affinity!=0x11)
                 throw new IOException("投屏窗口未能排除自身采集，已停止发送，避免画面递归。");
             if(!GetClientRect(window,out var client))throw new IOException("无法读取窗口区域。");
             var point=new Point();
             if(!ClientToScreen(window,ref point))throw new IOException("无法读取窗口位置。");
             var bounds=new Rect {Left=point.X,Top=point.Y,Right=point.X+client.Width,Bottom=point.Y+client.Height};
-            var monitor=MonitorFromWindow(window,2);
-            var info=new MonitorInfo {Size=Marshal.SizeOf<MonitorInfo>()};
-            if(monitor==IntPtr.Zero || !GetMonitorInfo(monitor,ref info))throw new IOException("无法读取显示器。");
-            if(bounds.Width<=0 || bounds.Height<=0 || bounds.Left<info.Monitor.Left || bounds.Top<info.Monitor.Top || bounds.Right>info.Monitor.Right || bounds.Bottom>info.Monitor.Bottom)
-                throw new IOException("请将整个投屏画面移入同一显示器，再点击继续。");
-            return new(monitor,info.Monitor,bounds);
+            if(bounds.Width<=0 || bounds.Height<=0)throw new IOException("投屏窗口暂时没有可采集区域。");
+            var monitors=new List<MonitorRegion>();bool failed=false;
+            MonitorCallback callback=(IntPtr monitor,IntPtr dc,ref Rect area,IntPtr data)=>{
+                var info=new MonitorInfo {Size=Marshal.SizeOf<MonitorInfo>()};
+                if(!GetMonitorInfo(monitor,ref info)){failed=true;return false;}
+                var overlap=Intersect(bounds,info.Monitor);
+                if(overlap.Width>0 && overlap.Height>0)monitors.Add(new(monitor,info.Monitor));
+                return true;
+            };
+            if(!EnumDisplayMonitors(IntPtr.Zero,IntPtr.Zero,callback,IntPtr.Zero) || failed)throw new IOException("暂时无法读取显示器布局。");
+            return new(bounds,monitors);
         } finally {if(previous!=IntPtr.Zero)SetThreadDpiAwarenessContext(previous);}
     }
 
     private static void RequireInputDesktop() {
         var input=OpenInputDesktop(0,false,1); // DESKTOP_READOBJECTS, no switching or policy changes.
-        if(input==IntPtr.Zero)throw new IOException("Windows 桌面已锁定或暂时不可访问，解锁后点击继续。");
+        if(input==IntPtr.Zero)throw new IOException("Windows 桌面已锁定或暂时不可访问，解锁后自动恢复。");
         try {
             var current=GetThreadDesktop(GetCurrentThreadId());
             var inputName=new System.Text.StringBuilder(256);
             var currentName=new System.Text.StringBuilder(256);
             if(!GetUserObjectInformation(input,2,inputName,512,out _) || !GetUserObjectInformation(current,2,currentName,512,out _) ||
                 !string.Equals(inputName.ToString(),currentName.ToString(),StringComparison.Ordinal))
-                throw new IOException("Windows 已切换到锁屏或安全桌面，返回后点击继续。");
+                throw new IOException("Windows 已切换到锁屏或安全桌面，返回后自动恢复。");
         } finally {CloseDesktop(input);}
     }
 
@@ -82,7 +94,7 @@ internal static class CaptureNative {
     [DllImport("user32.dll")]private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")]private static extern bool GetClientRect(IntPtr window,out Rect rect);
     [DllImport("user32.dll")]private static extern bool ClientToScreen(IntPtr window,ref Point point);
-    [DllImport("user32.dll")]private static extern IntPtr MonitorFromWindow(IntPtr window,uint flags);
+    [DllImport("user32.dll")]private static extern bool EnumDisplayMonitors(IntPtr dc,IntPtr clip,MonitorCallback callback,IntPtr data);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]private static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorInfo info);
     [DllImport("user32.dll")]private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")]private static extern bool IsWindowVisible(IntPtr window);
