@@ -5,7 +5,9 @@ public static class CacheMaintenance {
     public static void Prune(string root,int keep,TimeSpan maxAge) {
         try {
             if(!Directory.Exists(root)) return;
-            var candidates=new DirectoryInfo(root).EnumerateDirectories()
+            var directory=new DirectoryInfo(root);
+            if((directory.Attributes&FileAttributes.ReparsePoint)!=0)return;
+            var candidates=directory.EnumerateDirectories()
                 .Where(d=>Guid.TryParseExact(d.Name,"N",out _) && (d.Attributes&FileAttributes.ReparsePoint)==0)
                 .OrderByDescending(d=>d.CreationTimeUtc).ToArray();
             for(var i=0;i<candidates.Length;i++) {

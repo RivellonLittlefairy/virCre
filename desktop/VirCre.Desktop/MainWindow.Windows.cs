@@ -14,10 +14,13 @@ public sealed partial class MainWindow {
 
     private void AppWindows_Changed(object? sender, EventArgs args) => DispatcherQueue.TryEnqueue(() => {
         if (!closing) model.UpdateWindows(appWindows.Windows);
+        CloseIdleShortcutSession();
     });
     private void AppWindows_Problem(string message) => DispatcherQueue.TryEnqueue(() => ShowAction(message, true));
     private void ShowAction(string message, bool error = false) {
         if (closing) return;
+        // A shortcut-only session has no visible launcher to display failures.
+        if(error && shortcutOnly)ShowLauncher();
         ActionNotice.Severity = error ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
         ActionNotice.Title = message;
         ActionNotice.ActionButton = null;

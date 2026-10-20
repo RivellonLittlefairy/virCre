@@ -1,7 +1,7 @@
 namespace VirCre.Launcher;
 
 /// <summary>Owns only processes it started. Reservations exist before startup, so concurrent opens deduplicate.</summary>
-public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeout = null) {
+public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeout = null, Action<Exception>? observerFailure = null) {
     private sealed class Entry(AppLaunchRequest request) {
         public Guid Id {get;} = Guid.NewGuid();
         public AppLaunchRequest Request {get;} = request;
@@ -35,11 +35,13 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
         }
         if(!reused) {Notify();_ = StartAsync(entry,token);}
         await entry.Ready.Task.WaitAsync(token).ConfigureAwait(false);
+        IAppWindowProcess process;AppWindowInfo info;
         lock(sync) {
             if(entry.State!=AppWindowState.Running)throw new InvalidOperationException("应用窗口正在关闭，请稍后重新打开。");
-            if(entry.Process is not {HasExited:false} process)throw new IOException("应用窗口已经结束，请重新打开。");
-            return new(Info(entry),reused,process.Focus());
+            process=entry.Process is {HasExited:false} active?active:throw new IOException("应用窗口已经结束，请重新打开。");
+            info=Info(entry);
         }
+        return new(info,reused,process.Focus());
     }
     public bool Focus(Guid id) {
         IAppWindowProcess? process;
@@ -69,48 +71,61 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
             var process=host.Start(entry.Request);
             lock(sync)entry.Process=process;
             _ = WatchExitAsync(entry,process);
-            await process.WaitForReadyAsync(deadline.Token).ConfigureAwait(false);
+            await process.WaitForReadyAsync(deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();
             lock(sync)entry.State=AppWindowState.Running;
             entry.Ready.TrySetResult(Info(entry));
             Notify();
         } catch(Exception error) {
-            try {await CloseEntryAsync(entry).ConfigureAwait(false);}
-            catch(Exception cleanup) {Problem?.Invoke($"{entry.Request.Name} 启动后未能清理：{cleanup.Message}");}
             if(error is OperationCanceledException && !shutdown.IsCancellationRequested && !caller.IsCancellationRequested && !entry.CancelStart.IsCancellationRequested)
                 error=new TimeoutException("应用窗口启动超时，请重试。");
             entry.Ready.TrySetException(error);
-        } finally {entry.StartCompleted.TrySetResult();}
-    }
-    private Task CloseEntryAsync(Entry entry) {
-        lock(sync) {
-            if(entry.CloseWork is null || entry.CloseWork.IsFaulted || entry.CloseWork.IsCanceled)
-                entry.CloseWork=CloseCoreAsync(entry);
-            return entry.CloseWork;
+            try {await CloseEntryAsync(entry).ConfigureAwait(false);}
+            catch(Exception cleanup) {ReportProblem($"{entry.Request.Name} 启动后未能清理：{cleanup.Message}");}
+        } finally {
+            entry.Ready.TrySetException(new IOException("应用窗口未完成启动，请重试。"));
+            entry.StartCompleted.TrySetResult();
         }
     }
-    private async Task CloseCoreAsync(Entry entry) {
-        lock(sync)entry.State=AppWindowState.Closing;
-        Notify();
+    private Task CloseEntryAsync(Entry entry) {
+        TaskCompletionSource? completion=null;Task work;
+        lock(sync) {
+            if(entry.CloseWork is null || entry.CloseWork.IsFaulted || entry.CloseWork.IsCanceled) {
+                completion=new(TaskCreationOptions.RunContinuationsAsynchronously);
+                entry.CloseWork=completion.Task;
+                entry.State=AppWindowState.Closing;
+            }
+            work=entry.CloseWork;
+        }
+        // Reserve the task under the lock, but invoke hosts and subscribers only after releasing it.
+        if(completion!=null)_=CloseCoreAsync(entry,completion);
+        return work;
+    }
+    private async Task CloseCoreAsync(Entry entry,TaskCompletionSource completion) {
         try {
+            Notify();
             if(entry.Process is { } process) {
                 await process.CloseAsync().ConfigureAwait(false);
                 if(!process.HasExited)throw new IOException("窗口进程仍未退出，请重试关闭。");
                 process.Dispose();
             }
             Remove(entry);
-        } catch {
+            completion.TrySetResult();
+        } catch(Exception error) {
             lock(sync)entry.State=AppWindowState.CloseFailed;
-            Notify();throw;
+            Notify();completion.TrySetException(error);
         }
     }
     private async Task WatchExitAsync(Entry entry,IAppWindowProcess process) {
         try {
             await process.WaitForExitAsync().ConfigureAwait(false);
             AppWindowState state;lock(sync)state=entry.State;
-            if(process.ExitCode!=0 && state==AppWindowState.Running)Problem?.Invoke($"{entry.Request.Name} 的窗口已异常结束（{process.ExitCode}）。请检查设备连接后重新打开。");
-        } catch(Exception error) {Problem?.Invoke($"窗口状态读取失败：{error.Message}");}
-        finally {Remove(entry);process.Dispose();}
+            if(process.ExitCode!=0 && state==AppWindowState.Running)ReportProblem($"{entry.Request.Name} 的窗口已异常结束（{process.ExitCode}）。请检查设备连接后重新打开。");
+        } catch(Exception error) {ReportProblem($"窗口状态读取失败：{error.Message}");}
+        finally {
+            Remove(entry);
+            try {process.Dispose();}catch(Exception error) {ReportObserverFailure(error);}
+        }
     }
     private void Remove(Entry entry) {
         lock(sync) {
@@ -120,5 +135,19 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
         Notify();
     }
     private static AppWindowInfo Info(Entry entry)=>new(entry.Id,entry.Request,entry.State,entry.Process?.DisplayId);
-    private void Notify()=>Changed?.Invoke(this,EventArgs.Empty);
+    private void Notify() {
+        foreach(var handler in Changed?.GetInvocationList()??[]) {
+            try {((EventHandler)handler)(this,EventArgs.Empty);}
+            catch(Exception error) {ReportObserverFailure(error);}
+        }
+    }
+    private void ReportProblem(string message) {
+        foreach(var handler in Problem?.GetInvocationList()??[]) {
+            try {((Action<string>)handler)(message);}
+            catch(Exception error) {ReportObserverFailure(error);}
+        }
+    }
+    private void ReportObserverFailure(Exception error) {
+        try {observerFailure?.Invoke(error);}catch(Exception) { /* Diagnostics must not alter process ownership. */ }
+    }
 }

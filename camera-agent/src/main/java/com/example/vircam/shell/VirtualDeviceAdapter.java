@@ -226,25 +226,30 @@ final class VirtualDeviceAdapter implements AutoCloseable {
 
     @Override public synchronized void close() {
         if (!closed.compareAndSet(false, true)) return;
-        if(desktop!=null) desktop.close();
+        if(desktop!=null) AgentLog.cleanup("desktop-input", desktop::close);
         closeHidden(camera, "camera");
-        if (display != null) display.release();
+        if (display != null) AgentLog.cleanup("display", display::release);
         closeHidden(device, "device");
         try {
             callbacks.submit(() -> {
-                for (EglPattern pattern : streams.values()) pattern.close();
-                streams.clear();
+                try {
+                    for (Map.Entry<Integer, EglPattern> stream : streams.entrySet())
+                        AgentLog.cleanup("egl-stream-" + stream.getKey(), stream.getValue()::close);
+                } finally { streams.clear(); lastFrames.clear(); }
             }).get(3, TimeUnit.SECONDS);
-        } catch (Exception e) { AgentLog.event("cleanup-error", "resource", "egl", "error", e.toString()); }
-        callbacks.shutdownNow();
-        if (displayReader != null) displayReader.close();
-        if (drainThread != null) drainThread.quitSafely();
-        AgentLog.event("closed");
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            AgentLog.cleanupError("egl", e);
+        }
+        AgentLog.cleanup("callback-executor", () -> callbacks.shutdownNow());
+        if (displayReader != null) AgentLog.cleanup("display-reader", displayReader::close);
+        if (drainThread != null) AgentLog.cleanup("drain-thread", () -> drainThread.quitSafely());
+        AgentLog.cleanup("closed-log", () -> AgentLog.event("closed"));
     }
 
     private static void closeHidden(Object resource, String name) {
         if (resource == null) return;
         try { invoke(resource, "close", new Class<?>[0]); }
-        catch (Exception e) { AgentLog.event("cleanup-error", "resource", name, "error", e.toString()); }
+        catch (Exception e) { AgentLog.cleanupError(name, e); }
     }
 }

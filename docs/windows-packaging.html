@@ -34,15 +34,15 @@
     <h2>本次实施与使用入口</h2>
     <p>新增<code>packaging/virCre.iss</code>和<code>tools/Build-Installer.ps1</code>，采用文中固定AppId，当前用户安装到<code>%LOCALAPPDATA%\Programs\virCre</code>。提供开始菜单入口、可选桌面快捷方式和系统卸载入口，默认保留用户设置、缓存与应用图标。</p>
     <pre><code># 完整重编译release自定义scrcpy、发布、编译安装器、生成ZIP与SHA256。
-pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1
+pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1.1
 
 # 仅在确认release自定义运行时已重新构建时，复用这份缓存。
-pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1 -SkipRuntimeBuild</code></pre>
-    <p>输出位于<code>out/installers/</code>：<code>virCre-0.1-win-x64-setup.exe</code>、<code>virCre-0.1-win-x64-portable.zip</code>、<code>virCre-0.1-SHA256SUMS.txt</code>及<code>virCre-0.1-build.json</code>。每次构建使用新的package-staging目录，安装器和ZIP只来自该完整发布目录，不打包仓库、编译缓存、APK或设备日志。</p>
+pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1.1 -SkipRuntimeBuild</code></pre>
+    <p>输出位于<code>out/installers/</code>：<code>virCre-0.1.1-win-x64-setup.exe</code>、<code>virCre-0.1.1-win-x64-portable.zip</code>、<code>virCre-0.1.1-SHA256SUMS.txt</code>及<code>virCre-0.1.1-build.json</code>。每次构建使用新的package-staging目录，安装器和ZIP只来自该完整发布目录，不打包仓库、编译缓存、APK或设备日志。</p>
     <p>构建脚本检查必需资源、runtime-manifest全部文件哈希、六个配套功能标记及release类型，统一主程序和安装器版本。按照用户“不自动测试”的要求，只做编译和文件检查，不执行测试、不启动主程序、不安装成品、不操作手机。本机Inno Setup 6.7.3工具使用官方签名安装文件的便携模式放在<code>.cache/toolchains/inno-setup-6.7.3</code>，不修改全局PATH。</p>
     <p>正式相机源码的9个Java文件已复制到<code>camera-agent/src/main/java/com/example/vircam/</code>，与迁移前逐文件SHA256一致。<code>Build-Scrcpy.ps1</code>和独立agent构建脚本均改用新路径，Release客户端/server已经重新编译成功。原<code>android/</code>探针APK工程及根目录Gradle遗留项现已由用户手动清理，不再参与正式构建，也不会进入安装包。</p>
     <p>成品尚未做代码签名，不能将编译成功描述为干净系统安装、覆盖升级、卸载或设备功能已验收。安装前正常关闭virCre及它打开的投屏窗口；用户可用EXE安装，或将完整ZIP解压到固定位置使用。升级或卸载还需手动确认常驻ADB占用文件时的安装器处理，不自动终止系统中的其他ADB会话。</p>
-    <p>本次编译已成功生成EXE和ZIP，主程序与安装器文件版本均为0.1.0.0。独立静态审查未发现明确Critical/Important；首轮ZIP中央目录563个文件与发布目录一致，主EXE位于根，运行时和图标DEX路径齐全。最终交付前同步本页与当前使用说明，再重新制作同版本包并核对清单、ZIP文件及SHA256。没有自动安装或运行成品。</p>
+    <p>首版0.1已完成EXE与ZIP构建，主程序和安装器文件版本为0.1.0.0；最终ZIP的561个文件已与发布目录核对，19个运行时文件SHA256通过。当前源码版本0.1.1的构建与提交记录见<a href="release-0.1.1.html">版本说明</a>。安装、升级、卸载和设备功能仍由用户手动验收，不把源码编译等同安装器验收。</p>
   </section>
 
   <section id="current">
@@ -74,7 +74,7 @@ pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1 -SkipRuntimeBuild
       </tbody>
     </table></div>
     <p>安装器自身是一个 EXE，程序安装后仍然是包含多个文件的目录。将全部 WinUI、.NET 和 scrcpy 组件强行合成单个应用 EXE，会增加资源和依赖问题，对当前目标没有必要。</p>
-    <p>建议成品命名：<code>virCre-0.1-win-x64-setup.exe</code> 和 <code>virCre-0.1-win-x64-portable.zip</code>。用户指定当前对外版本为0.1，Windows文件版本为0.1.0.0。</p>
+    <p>建议成品命名：<code>virCre-0.1.1-win-x64-setup.exe</code> 和 <code>virCre-0.1.1-win-x64-portable.zip</code>。用户指定当前对外版本为0.1.1，Windows文件版本为0.1.1.0。</p>
   </section>
 
   <section id="publish">
@@ -160,7 +160,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Desktop startup validation failed' }</code></p
   #error SetupDir is required
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.1"
+  #define AppVersion "0.1.1"
 #endif
 
 [Setup]
@@ -205,7 +205,7 @@ Filename: "{app}\VirCre.Desktop.exe"; Description: "启动 virCre"; WorkingDir: 
     <p>在未来实际创建了上面的 .iss 文件，并完成第 3 节发布后，继续在同一 PowerShell 会话中执行：</p>
     <pre><code># 按本机实际安装位置调整。
 $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-$version = '0.1'
+$version = '0.1.1'
 $setupDir = Join-Path $PWD 'out\installers'
 New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
 
@@ -218,7 +218,7 @@ Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $zip -Force
 
 $setup = Join-Path $setupDir "virCre-$version-win-x64-setup.exe"
 Get-FileHash -Algorithm SHA256 -LiteralPath $setup, $zip</code></pre>
-    <p>预期输出是 <code>out/installers/virCre-0.1-win-x64-setup.exe</code> 和同目录的 ZIP。这里的 <code>$publish</code> 必须指向已经检查通过的完整目录；不要把仓库根目录传给安装器，避免把缓存、源码、设备日志等一起装进去。</p>
+    <p>预期输出是 <code>out/installers/virCre-0.1.1-win-x64-setup.exe</code> 和同目录的 ZIP。这里的 <code>$publish</code> 必须指向已经检查通过的完整目录；不要把仓库根目录传给安装器，避免把缓存、源码、设备日志等一起装进去。</p>
     <p>现已提供<code>tools/Build-Installer.ps1</code>统一这些步骤。它将版本传入<code>Publish-Desktop.ps1 -Version</code>，调用Inno Setup后生成ZIP与校验值；只做静态文件检查，不执行功能或安装测试。</p>
   </section>
 
@@ -233,7 +233,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath $setup, $zip</code></pre>
       <li>用标准用户与管理员场景分别测试，确认安装范围与升级规则一致。</li>
     </ol>
     <p>制作成功后，MSI 的典型静默安装命令如下。<code>/qn</code> 不会自动授予管理员权限；所有用户安装仍需相应权限。</p>
-    <pre><code>msiexec.exe /i "virCre-0.1-win-x64.msi" /qn /norestart /L*v "virCre-install.log"</code></pre>
+    <pre><code>msiexec.exe /i "virCre-0.1.1-win-x64.msi" /qn /norestart /L*v "virCre-install.log"</code></pre>
     <p>当前仓库没有 WiX 工程，因此不能给出一条现成命令直接生成 MSI。普通个人分发优先完成 EXE；有企业部署要求时，再增加 MSI 更合适。</p>
   </section>
 
@@ -266,7 +266,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath $setup, $zip</code></pre>
       <li><strong>分发材料：</strong>确定主项目许可证，带上第三方许可和所需源码/构建材料；不要遗漏 <code>runtime/scrcpy/licenses</code>。</li>
     </ol>
     <p>代码签名不是本地生成 EXE 安装包的前提。公开分发时建议签名并加可信时间戳，便于用户确认发布者；签名本身不保证 SmartScreen 不提示。当前检查没有验证签名、干净系统安装、覆盖升级或设备功能。</p>
-    <p>安装器版本和应用程序集版本已由Build-Installer与Publish-Desktop的Version参数统一；0.1对应EXE文件版本0.1.0.0。后续升级应递增版本并验证固定目录、用户数据和快捷方式。</p>
+    <p>安装器版本和应用程序集版本已由Build-Installer与Publish-Desktop的Version参数统一；0.1.1对应EXE文件版本0.1.1.0。后续升级应递增版本并验证固定目录、用户数据和快捷方式。</p>
   </section>
 
   <section id="sources">

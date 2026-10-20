@@ -76,11 +76,14 @@ public sealed partial class MainWindow {
         }
     }
     internal bool TryRecoverCatalogFormatError(Exception error) {
-        if(error is not InvalidDataException || !ready || closing || windowShutdown.HasStarted)return false;
+        if(!CatalogErrors.IsFormatFailure(error) || !ready || closing || windowShutdown.HasStarted || !(scanning || model.IsLoading))return false;
         ++scanGeneration;deviceScan?.Cancel();scanning=false;
         var reset=catalogController.SelectAsync(null,lifetime.Token);
-        if(!reset.IsCompleted)return false;
-        reset.GetAwaiter().GetResult();
+        if(!reset.IsCompletedSuccessfully)return false;
+        syncingDevices=true;
+        try {DevicePicker.SelectedItem=null;DevicePicker.ItemsSource=null;}
+        finally {syncingDevices=false;}
+        refreshTask=Task.CompletedTask;
         model.ReportDeviceError(error.Message);
         ShowAction("设备数据格式异常，请刷新设备后重试。",true);
         RenderState();return true;

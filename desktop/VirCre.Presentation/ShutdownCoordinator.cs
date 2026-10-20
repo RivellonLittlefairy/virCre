@@ -5,11 +5,13 @@ public sealed record ShutdownFailure(string Name,Exception Error);
 public sealed record ShutdownResult(bool CanClose,IReadOnlyList<ShutdownFailure> Failures);
 
 /// <summary>Coordinates the UI-thread close attempt while preserving ownership of live app windows.</summary>
-public sealed class ShutdownCoordinator {
+public sealed class ShutdownCoordinator(TimeSpan? timeout=null) {
     public bool HasStarted {get;private set;}
     public bool IsStopping {get;private set;}
     private Task<ShutdownResult>? attempt;
-    private Task<ShutdownFailure[]>? backgroundCompletion;
+    private readonly TimeSpan waitLimit=timeout is { } value && value>TimeSpan.Zero?value:TimeSpan.FromSeconds(15);
+    private (string Name,Task<ShutdownFailure?> Completion)[]? backgroundTasks;
+    private Task<ShutdownFailure?>? windowCompletion;
     public Task<ShutdownResult> TryStopAsync(IReadOnlyList<ShutdownWork> background,Func<Task> stopWindows,Func<bool> hasWindows,Action<bool> setInteraction) {
         if(attempt is {IsCompleted:false})return attempt;
         HasStarted=true;IsStopping=true;
@@ -23,11 +25,20 @@ public sealed class ShutdownCoordinator {
         try {
             setInteraction(false);
             // Stop accepting work once. Historical task faults remain observable but cannot poison retries.
-            backgroundCompletion??=ObserveAllAsync(background);
-            var windowCompletion=ObserveAsync(new("app-windows",stopWindows));
-            var failures=(await backgroundCompletion).ToList();
-            if(await windowCompletion is { } windowFailure)failures.Add(windowFailure);
-            result=new(!hasWindows(),failures);
+            backgroundTasks??=background.Select(work=>(Name:work.Name,Completion:ObserveAsync(work))).ToArray();
+            if(windowCompletion is not {IsCompleted:false})windowCompletion=ObserveAsync(new("app-windows",stopWindows));
+            var tracked=backgroundTasks.Append((Name:"app-windows",Completion:windowCompletion)).ToArray();
+            try {await Task.WhenAll(tracked.Select(work=>work.Completion)).WaitAsync(waitLimit);}
+            catch(TimeoutException) { /* Work retains ownership and may finish before the next close attempt. */ }
+            var failures=new List<ShutdownFailure>();
+            var pending=false;
+            foreach(var work in tracked) {
+                if(!work.Completion.IsCompleted) {
+                    pending=true;
+                    failures.Add(new(work.Name,new TimeoutException($"收尾任务 {work.Name} 等待超过 {waitLimit.TotalSeconds:0.#} 秒，仍在后台结束。")));
+                } else if(await work.Completion is { } failure)failures.Add(failure);
+            }
+            result=new(!pending && !hasWindows(),failures);
         } catch(Exception error) {unexpected=error;}
         finally {
             IsStopping=false;
@@ -35,10 +46,6 @@ public sealed class ShutdownCoordinator {
         }
         if(unexpected!=null)completion.TrySetException(unexpected);
         else completion.TrySetResult(result!);
-    }
-    private static async Task<ShutdownFailure[]> ObserveAllAsync(IReadOnlyList<ShutdownWork> work) {
-        var failures=await Task.WhenAll(work.Select(ObserveAsync));
-        return failures.OfType<ShutdownFailure>().ToArray();
     }
     private static async Task<ShutdownFailure?> ObserveAsync(ShutdownWork work) {
         try {await work.Stop();return null;}

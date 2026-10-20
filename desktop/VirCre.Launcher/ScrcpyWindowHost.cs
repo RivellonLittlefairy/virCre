@@ -13,9 +13,11 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
     public static IReadOnlyList<string> Arguments(AppLaunchRequest request) {
         if(!SerialPattern().IsMatch(request.Serial) || !PackagePattern().IsMatch(request.PackageName))
             throw new ArgumentException("设备或应用标识无效，请刷新列表后重试。");
-        return ["-s",request.Serial,"--new-display=1440x2560/480","--start-app="+request.PackageName,
-            "--window-title="+request.Name+" · "+request.DeviceName+" · virCre","--no-audio","--display-ime-policy=local",
-            "--window-width=720","--window-height=1280"];
+        // Omitted dimensions let the server read this phone's main display size and DPI.
+        // Omitted window dimensions let the client preserve that aspect ratio within the PC work area.
+        // Keep virtual displays active; primary-screen activity is opt-in via scrcpy's panel-off command.
+        return ["-s",request.Serial,"--new-display","--start-app="+request.PackageName,
+            "--window-title="+request.Name+" · "+request.DeviceName+" · virCre","--no-audio","--display-ime-policy=local","--keep-active"];
     }
     public IAppWindowProcess Start(AppLaunchRequest request) => StartCore(request, null);
     public IAppWindowProcess StartWithCamera(AppLaunchRequest request, string cameraConfig) {
@@ -94,6 +96,13 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
                 if(line.EndsWith("IME commit rejected at "+candidate,StringComparison.Ordinal)) {stage=candidate;break;}
             }
             if(line.EndsWith("Text key injection failed",StringComparison.Ordinal)) stage="native-key";
+            foreach(var candidate in new[]{"touch-size-mismatch","touch-pointer-limit","touch-inject-rejected",
+                "touch-down-accepted","touch-up-zero","touch-up-short","touch-up-normal","touch-up-long"}) {
+                if(line.EndsWith("VirCre touch stage: "+candidate,StringComparison.Ordinal)) {stage=candidate;break;}
+            }
+            foreach(var candidate in new[]{"power-main-activity-enabled","power-main-asleep","power-panel-restored"}) {
+                if(line.EndsWith("VirCre power stage: "+candidate,StringComparison.Ordinal)) {stage=candidate;break;}
+            }
             if(stage==null)return;
             lock(logSync) {if(!reportedInputFailures.Add(stage))return;}
             inputDiagnostic?.Invoke(stage);

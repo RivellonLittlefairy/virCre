@@ -17,4 +17,13 @@ final class AgentLog {
             Log.i("VirCreAgent", json.toString());
         } catch (Exception e) { throw new IllegalStateException("Cannot encode diagnostic log", e); }
     }
+    static void cleanup(String resource, Runnable release) {
+        try { release.run(); }
+        catch (RuntimeException failure) { cleanupError(resource, failure); }
+    }
+    static void cleanupError(String resource, Exception failure) {
+        // A broken diagnostic sink must never prevent the next resource from being released.
+        try { event("cleanup-error", "resource", resource, "error", failure.toString()); }
+        catch (RuntimeException ignored) { /* Shutdown remains best effort even after logging fails. */ }
+    }
 }

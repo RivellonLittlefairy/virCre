@@ -24,6 +24,7 @@ final class EglPattern implements AutoCloseable {
     private EGLSurface window = EGL14.EGL_NO_SURFACE;
     private final Surface surface;
     private int texture,program;
+    private boolean closed;
     private Bitmap uploaded,placeholder;
     private final FloatBuffer vertices=buffer(new float[]{-1,-1,1,-1,-1,1,1,1});
     private final FloatBuffer coordinates=buffer(new float[]{0,1,1,1,0,0,1,0});
@@ -160,21 +161,31 @@ final class EglPattern implements AutoCloseable {
     }
 
     @Override public void close() {
-        if (display != EGL14.EGL_NO_DISPLAY) {
-            if(window!=EGL14.EGL_NO_SURFACE && context!=EGL14.EGL_NO_CONTEXT) {
-                current();
-                if(texture!=0) GLES20.glDeleteTextures(1,new int[]{texture},0);
-                if(program!=0) GLES20.glDeleteProgram(program);
+        if (closed) return;
+        closed = true;
+        try {
+            if (display != EGL14.EGL_NO_DISPLAY) {
+                if(window!=EGL14.EGL_NO_SURFACE && context!=EGL14.EGL_NO_CONTEXT) {
+                    AgentLog.cleanup("egl-gl-objects", () -> {
+                        current();
+                        if(texture!=0) GLES20.glDeleteTextures(1,new int[]{texture},0);
+                        if(program!=0) GLES20.glDeleteProgram(program);
+                    });
+                }
+                AgentLog.cleanup("egl-unbind", () -> check(EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE,
+                        EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT), "unbind"));
+                if (window != EGL14.EGL_NO_SURFACE)
+                    AgentLog.cleanup("egl-surface", () -> check(EGL14.eglDestroySurface(display, window), "destroySurface"));
+                if (context != EGL14.EGL_NO_CONTEXT)
+                    AgentLog.cleanup("egl-context", () -> check(EGL14.eglDestroyContext(display, context), "destroyContext"));
+                AgentLog.cleanup("egl-display", () -> check(EGL14.eglTerminate(display), "terminate"));
+                AgentLog.cleanup("egl-thread", () -> check(EGL14.eglReleaseThread(), "releaseThread"));
             }
-            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
-            if (window != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, window);
-            if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context);
-            EGL14.eglTerminate(display);
-            EGL14.eglReleaseThread();
+        } finally {
+            display = EGL14.EGL_NO_DISPLAY;
+            context = EGL14.EGL_NO_CONTEXT;
+            window = EGL14.EGL_NO_SURFACE;
+            AgentLog.cleanup("camera-surface", surface::release);
         }
-        display = EGL14.EGL_NO_DISPLAY;
-        context = EGL14.EGL_NO_CONTEXT;
-        window = EGL14.EGL_NO_SURFACE;
-        surface.release();
     }
 }

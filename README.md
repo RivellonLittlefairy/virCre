@@ -6,7 +6,7 @@
 
 Windows 10 2004（19041）或更高版本，x64；手机需要 Android 16（API 36）和已授权的 USB/无线 ADB。
 
-当前版本为 **0.1**，安装器和便携包位于 `out/installers/`。安装版默认安装到当前用户的 `%LOCALAPPDATA%\Programs\virCre`，无需管理员权限。便携包需完整解压到固定目录，再启动 `VirCre.Desktop.exe`。
+当前源码版本为 **0.1.1**。运行打包命令后，安装器和便携包生成到 `out/installers/`。安装版默认安装到当前用户的 `%LOCALAPPDATA%\Programs\virCre`，无需管理员权限。便携包需完整解压到固定目录，再启动 `VirCre.Desktop.exe`。
 
 ADB、修改版 scrcpy、.NET 和 WinUI 运行依赖已内置，用户不需要自行安装 scrcpy、Android Studio 或开发工具。USB 驱动与手机调试授权仍需按设备情况完成。
 
@@ -14,12 +14,13 @@ ADB、修改版 scrcpy、.NET 和 WinUI 运行依赖已内置，用户不需要�
 - [虚拟摄像头、默认开关与帧率设置](docs/virtual-camera-window.html)
 - [应用图标和桌面快捷方式](docs/desktop-shortcuts.html)
 - [内置 scrcpy 与来源](docs/bundled-scrcpy.html)
+- [0.1.1 变更与已知限制](docs/release-0.1.1.html)
 
 ## 当前行为
 
 - 启动先读手机应用缓存，点击刷新时才重新读取；保留真实图标、收藏和主题。
 - 点击打开应用、双击卡片或使用快捷方式，均遵循设置中的相机开关，默认开启。
-- 虚拟摄像头输入与虚拟显示分辨率一致，默认1440×2560；随投屏窗口移动、缩放更新下层桌面。
+- 新窗口启动时读取手机主屏的尺寸和DPI，跟随手机原生比例，初始窗口等比适应电脑可用空间；虚拟摄像头输入与实际虚拟显示分辨率一致，随投屏窗口移动、缩放更新下层桌面。
 - 设置内可调1–30fps，默认15fps，目标帧率可在运行中调整；实际性能由电脑、手机和连接决定。
 - 当前同时仅支持一个相机窗口，每次最长10分钟。关闭全局开关后可新建普通窗口；已有窗口保持当前模式。
 - 不需要探针APK、不获取root、不替换手机主屏上的物理相机，不保存相机图像、输入文字或剪贴板内容。
@@ -48,7 +49,7 @@ docs/                        HTML说明与历史验证记录
 pwsh -NoProfile -File .\tools\Start-Desktop.ps1
 
 # 一键重编译release运行时，发布并生成安装器与便携包
-pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1
+pwsh -NoProfile -File .\tools\Build-Installer.ps1 -Version 0.1.1
 ```
 
 打包脚本只编译和检查文件，不自动运行测试、安装成品或操作手机。安装、卸载、覆盖升级、干净系统启动及设备功能由用户手动验收；不能把编译成功等同于这些项目已通过。
