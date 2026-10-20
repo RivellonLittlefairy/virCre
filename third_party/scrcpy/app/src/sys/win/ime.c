@@ -10,6 +10,13 @@ static LRESULT CALLBACK
 ime_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
                 UINT_PTR subclass_id, DWORD_PTR data) {
     SDL_Window *window = (SDL_Window *) data;
+    // Observe only the fixed close-message category, without changing handling
+    // or logging keyboard input, message parameters, or window contents.
+    if (message == WM_CLOSE) {
+        LOGI("{\"event\":\"client-stop\",\"reason\":\"native-close\"}");
+    } else if (message == WM_SYSCOMMAND && (wparam & 0xfff0) == SC_CLOSE) {
+        LOGI("{\"event\":\"client-stop\",\"reason\":\"native-system-close\"}");
+    }
     if (message == WM_IME_STARTCOMPOSITION || message == WM_IME_ENDCOMPOSITION ||
             message == WM_INPUTLANGCHANGE || message == WM_KILLFOCUS) {
         // Native composition UI does not emit SDL_TEXT_EDITING. Queue only its state,

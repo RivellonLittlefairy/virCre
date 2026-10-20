@@ -88,6 +88,19 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
                     "render-error"=>"camera-render-failed", _=>null
                 };
                 if(kind.GetString()=="shutdown-started")stage="phone-shutdown-started";
+                if(kind.GetString()=="host-close-requested")stage="desktop-window-close-requested";
+                if(kind.GetString()=="client-stop" && root.TryGetProperty("reason",out var stopReason)) {
+                    stage=stopReason.GetString() switch {
+                        "quit-event"=>"client-quit-event", "quit-shortcut"=>"client-quit-shortcut",
+                        "native-close"=>"client-native-close", "native-system-close"=>"client-native-system-close",
+                        "time-limit"=>"client-time-limit", "device-disconnected"=>"client-device-disconnected", _=>null
+                    };
+                }
+                if(kind.GetString()=="server-processor-ended" && root.TryGetProperty("processor",out var processor)) {
+                    stage=processor.GetString() switch {
+                        "controller"=>"phone-controller-ended", "video"=>"phone-video-ended", "other"=>"phone-processor-ended", _=>null
+                    };
+                }
                 if(kind.GetString()=="closed")stage="phone-resources-closed";
                 if(kind.GetString()=="input-disconnected") {
                     stage=root.GetProperty("reason").GetString() switch {

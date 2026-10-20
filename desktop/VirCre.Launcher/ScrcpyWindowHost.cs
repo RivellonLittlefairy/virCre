@@ -139,6 +139,8 @@ public sealed partial class ScrcpyWindowHost(BundledTools? tools=null, Action<st
         }
         public async Task CloseAsync() {
             if(!HasExited) {
+                try {sessionEvents?.Invoke("{\"event\":\"host-close-requested\"}");}
+                catch(Exception) { /* Diagnostics must not prevent closing the owned process. */ }
                 try {process.CloseMainWindow();}catch(InvalidOperationException){}
                 try {await completion.WaitAsync(TimeSpan.FromSeconds(8)).ConfigureAwait(false);return;}
                 catch(TimeoutException) {

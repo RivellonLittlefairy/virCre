@@ -178,6 +178,11 @@ public final class Server {
             Completion completion = new Completion(asyncProcessors.size());
             for (AsyncProcessor asyncProcessor : asyncProcessors) {
                 asyncProcessor.start((fatalError) -> {
+                    if (options.getVircreCamera() != null) {
+                        String processor = asyncProcessor instanceof Controller ? "controller"
+                                : asyncProcessor instanceof SurfaceEncoder ? "video" : "other";
+                        Ln.i("{\"event\":\"server-processor-ended\",\"processor\":\"" + processor + "\",\"fatal\":" + fatalError + "}");
+                    }
                     completion.addCompleted(fatalError);
                 });
             }

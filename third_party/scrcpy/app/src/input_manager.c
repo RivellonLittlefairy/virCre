@@ -541,6 +541,7 @@ sc_input_manager_process_key(struct sc_input_manager *im,
                 }
                 return;
             case SDLK_Q:
+                LOGI("{\"event\":\"client-stop\",\"reason\":\"quit-shortcut\"}");
                 sc_push_event(SDL_EVENT_QUIT);
                 return;
         }

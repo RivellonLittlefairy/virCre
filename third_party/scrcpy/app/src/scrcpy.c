@@ -124,6 +124,7 @@ event_loop(struct scrcpy *s, bool has_screen) {
     while (SDL_WaitEvent(&event)) {
         switch (event.type) {
             case SC_EVENT_DEVICE_DISCONNECTED:
+                LOGI("{\"event\":\"client-stop\",\"reason\":\"device-disconnected\"}");
                 LOGW("Device disconnected");
                 if (has_screen) {
                     sc_screen_handle_event(&s->screen, &event);
@@ -145,9 +146,11 @@ event_loop(struct scrcpy *s, bool has_screen) {
                 LOGE("AOA open error");
                 return SCRCPY_EXIT_FAILURE;
             case SC_EVENT_TIME_LIMIT_REACHED:
+                LOGI("{\"event\":\"client-stop\",\"reason\":\"time-limit\"}");
                 LOGI("Time limit reached");
                 return SCRCPY_EXIT_SUCCESS;
             case SDL_EVENT_QUIT:
+                LOGI("{\"event\":\"client-stop\",\"reason\":\"quit-event\"}");
                 LOGD("User requested to quit");
                 return SCRCPY_EXIT_SUCCESS;
             default:
