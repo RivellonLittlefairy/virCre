@@ -81,7 +81,8 @@ try {
     if($LASTEXITCODE -ne 0) {throw 'scrcpy server Java compilation failed'}
     $dexArgs=Join-Path $serverBuild 'd8.args'
     # D8 treats each response-file line as one literal argument; unlike javac, it does not unquote paths.
-    $dexArguments=@('--min-api','36','--lib',$androidJar.Replace('\','/'),'--output',(Join-Path $serverBuild 'scrcpy-server.zip').Replace('\','/'))
+    # Ordinary app windows support Android 10; camera code is entered only on Android 16+.
+    $dexArguments=@('--min-api','29','--lib',$androidJar.Replace('\','/'),'--output',(Join-Path $serverBuild 'scrcpy-server.zip').Replace('\','/'))
     $dexArguments+=Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse | ForEach-Object {$_.FullName.Replace('\','/')}
     $dexArguments | Set-Content -LiteralPath $dexArgs -Encoding utf8
     & (Join-Path $Java 'bin\java.exe') -cp (Join-Path $buildTools.FullName 'lib\d8.jar') com.android.tools.r8.D8 ('@'+$dexArgs)
@@ -104,7 +105,7 @@ try {
     })
     $sourceFingerprint=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
     $officialRecord=Get-Content -LiteralPath (Join-Path $officialDirectory 'runtime-manifest.json') -Raw | ConvertFrom-Json
-    [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1','window-capture-exclusion-v1','vdm-direct-encoder-v1','camera-hd-jpeg-v1','camera-display-size-v1','camera-live-move-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
+    [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1','window-capture-exclusion-v1','vdm-direct-encoder-v1','camera-hd-jpeg-v1','camera-display-size-v1','camera-live-move-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=29;virtualCameraMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
 } finally {
     foreach($name in $previousEnvironment.Keys) {[Environment]::SetEnvironmentVariable($name,$previousEnvironment[$name])}
 }

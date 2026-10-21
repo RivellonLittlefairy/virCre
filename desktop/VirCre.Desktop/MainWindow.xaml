@@ -164,6 +164,7 @@
                                     <StackPanel Spacing="14">
                                         <StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE722;" FontSize="18" /><TextBlock Text="虚拟摄像头" FontSize="16" FontWeight="SemiBold" /></StackPanel>
                                         <ToggleSwitch x:Name="VirtualCameraToggle" Header="打开应用时启用虚拟摄像头" IsOn="True" OnContent="已开启" OffContent="已关闭" Toggled="VirtualCamera_Toggled" />
+                                        <TextBlock x:Name="VirtualCameraCompatibility" Style="{StaticResource SectionHint}" />
                                         <TextBlock Text="将投屏窗口下方的桌面作为手机应用的相机画面，随窗口移动更新。开关对新打开的应用和桌面快捷方式生效，已有窗口保持当前模式。" Style="{StaticResource SectionHint}" />
                                         <NumberBox x:Name="CameraFrameRateBox" Header="桌面相机目标帧率（fps）" Minimum="1" Maximum="30" Value="15" SmallChange="1" LargeChange="5"
                                                    SpinButtonPlacementMode="Inline" Width="220" HorizontalAlignment="Left" ValueChanged="CameraFrameRate_ValueChanged" LostFocus="CameraFrameRate_LostFocus" />

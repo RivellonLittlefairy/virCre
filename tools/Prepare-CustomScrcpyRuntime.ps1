@@ -8,6 +8,9 @@ $manifest=Get-Content -LiteralPath (Join-Path $RuntimeDirectory 'runtime-manifes
 if($manifest.distribution -ne 'vircre-source-build' -or $manifest.features -notcontains 'windows-ime-v1') {
     throw 'Build the custom Windows IME runtime first with tools/Build-Scrcpy.ps1'
 }
+if($manifest.androidMinApi -ne 29 -or $manifest.virtualCameraMinApi -ne 36) {
+    throw 'Rebuild with tools/Build-Scrcpy.ps1: ordinary windows require the Android 10 compatible server; virtual camera requires Android 16.'
+}
 foreach($required in @('scrcpy.exe','scrcpy-server','adb.exe','AdbWinApi.dll','AdbWinUsbApi.dll','SDL3.dll','avcodec-63.dll','avformat-63.dll','avutil-61.dll','swresample-7.dll','libusb-1.0.dll')) {
     if(-not $manifest.files.$required) {throw "Custom runtime manifest is missing $required"}
 }

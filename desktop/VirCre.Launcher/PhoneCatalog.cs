@@ -9,6 +9,8 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
         var devices=ParseDevices(result.Output).ToArray();
         for(var i=0;i<devices.Length;i++) {
             if(devices[i].State!=DeviceState.Online) continue;
+            try {devices[i]=devices[i] with {ApiLevel=await AndroidCompatibility.ReadApiLevelAsync(runner,devices[i].Serial,token).ConfigureAwait(false)};}
+            catch(Exception error) when(error is IOException or TimeoutException) { /* Keep cached apps visible; launching requires a confirmed Android version. */ }
             try {devices[i]=devices[i] with {HardwareId=await ShortcutRequest.GetHardwareIdAsync(runner,devices[i].Serial,token).ConfigureAwait(false)};}
             catch(Exception error) when(error is IOException or TimeoutException) { /* Directory discovery still works when an OEM hides its serial. */ }
         }

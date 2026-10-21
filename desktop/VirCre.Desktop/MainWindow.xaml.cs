@@ -179,7 +179,7 @@ public sealed partial class MainWindow : Window {
         DevicePicker.IsEnabled=!cleanupOnly && !scanning;
         RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
         AppGrid.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading && model.HasDevice;ThemeChoice.IsEnabled=!cleanupOnly;
-        VirtualCameraToggle.IsEnabled=!cleanupOnly;CameraFrameRateBox.IsEnabled=!cleanupOnly;
+        RenderCameraCompatibility(cleanupOnly);
         foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
         if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;

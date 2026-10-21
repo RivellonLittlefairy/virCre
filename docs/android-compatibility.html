@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>virCre Android 版本兼容说明</title>
+  <style>
+    body{max-width:960px;margin:40px auto;padding:0 24px;font:16px/1.8 system-ui,"Microsoft YaHei UI",sans-serif;color:#223}
+    h1,h2{line-height:1.4}table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:left;vertical-align:top;border-bottom:1px solid #ddd}
+    code{background:#eee;padding:2px 5px;overflow-wrap:anywhere}.note{padding:12px 18px;background:#eef4ff;border-left:4px solid #4b75bb}
+  </style>
+</head>
+<body>
+  <h1>Android 版本兼容说明</h1>
+  <p>virCre 按手机系统版本选择应用启动模式。普通模式通过 scrcpy 创建独立应用显示，不依赖虚拟摄像头所需的 Android 16 接口。</p>
+  <table>
+    <thead><tr><th>手机系统</th><th>应用窗口</th><th>桌面画面虚拟摄像头</th></tr></thead>
+    <tbody>
+      <tr><td>Android 16 / API 36 及以上</td><td>支持普通模式</td><td>按设置启用，仍取决于系统及应用兼容性</td></tr>
+      <tr><td>Android 10～15 / API 29～35</td><td>作为普通模式兼容目标</td><td>自动禁用</td></tr>
+      <tr><td>Android 9 / API 28 及以下</td><td>不支持当前独立应用窗口方案</td><td>不支持</td></tr>
+    </tbody>
+  </table>
+  <p class="note">本次改动通过编译与静态检查交付，没有自动启动或操作手机应用，也没有执行运行时测试。Android 10～15 的实际窗口、输入和厂商系统兼容性仍需真机确认；最低 API 声明不代表所有应用均已验证可用。</p>
+  <h2>使用方式</h2>
+  <p>连接手机并刷新设备后，程序读取系统 API 版本。Android 10～15 手机从应用列表或桌面快捷方式启动应用时，均自动使用普通模式。设置页的虚拟摄像头开关显示为关闭且不可修改，并说明当前设备不支持该功能。</p>
+  <p>这一限制仅对当前手机生效，不会修改已保存的相机默认设置。切换至 Android 16 或以上手机后，恢复显示原有设置。已有应用窗口保持启动时的模式；其他手机上正在运行的相机会话仍可调整目标帧率。</p>
+  <p>应用列表、图标、缓存、收藏和快捷方式沿用现有实现。窗口支持鼠标和电脑键盘输入，中文继续使用电脑输入法。普通模式不将电脑桌面画面送入相机，应用使用物理相机的行为由手机系统和应用决定。</p>
+  <p>系统版本读取失败时，应用列表可以保留，但新窗口不会猜测系统版本后启动；请检查 ADB 连接并刷新设备。Android 9 或以下手机会在启动时收到版本要求提示。</p>
+  <h2>构建边界</h2>
+  <p>应用目录导出器和内置 scrcpy 服务端均以 API 29 为最低运行版本。虚拟摄像头保留 API 36 检查，只有支持的设备会进入该分支。独立构建的相机代理仍要求 API 36。</p>
+  <p>构建仍使用 Android SDK API 36；编译 SDK 与最低运行版本分别定义。修改最低运行版本后，需要重新构建内置 scrcpy，不能仅替换桌面程序。自定义运行时清单记录 <code>androidMinApi=29</code> 和 <code>virtualCameraMinApi=36</code>，桌面构建会拒绝缺少这些版本声明的旧运行时。</p>
+  <h2>手动验证建议</h2>
+  <ol>
+    <li>在 Android 10～15 手机上刷新设备与应用，确认应用名称、图标和缓存正常；在设置中确认虚拟摄像头已自动禁用。</li>
+    <li>从应用列表打开应用，检查画面、鼠标点击、滚动，以及英文、数字和电脑输入法中文输入。</li>
+    <li>关闭窗口与主程序，通过已有桌面快捷方式打开应用，确认直接进入普通窗口。</li>
+    <li>切换至 Android 16 手机，确认之前保存的相机开关状态未被覆盖；新窗口按该设置选择模式。</li>
+  </ol>
+  <p><a href="../README.md">项目说明</a> · <a href="virtual-camera-window.html">虚拟摄像头说明</a> · <a href="windows-packaging.html">Windows 打包说明</a></p>
+</body>
+</html>

@@ -12,9 +12,26 @@ public sealed partial class MainWindow {
     internal static readonly string ShortcutDataDirectory=Path.Combine(PreferredDataDirectory,"shell");
     private readonly SettingsStore settingsStore=new(Path.Combine(DataDirectory,"settings.json"));
     private Task settingsTask=Task.CompletedTask;
+    private bool syncingCameraSettings;
     private void VirtualCamera_Toggled(object sender,RoutedEventArgs args) {
-        if(!ready || windowShutdown.HasStarted)return;
+        if(!ready || syncingCameraSettings || windowShutdown.HasStarted)return;
         model.SetVirtualCameraEnabled(VirtualCameraToggle.IsOn);
+    }
+    private void RenderCameraCompatibility(bool cleanupOnly) {
+        var device=DevicePicker.SelectedItem as PhoneDevice;
+        var online=device?.State==DeviceState.Online;
+        var unavailable=online && !device!.SupportsVirtualCamera;
+        syncingCameraSettings=true;
+        try {VirtualCameraToggle.IsOn=model.VirtualCameraEnabled && !unavailable;}
+        finally {syncingCameraSettings=false;}
+        VirtualCameraToggle.IsEnabled=!cleanupOnly && !unavailable;
+        // A camera on another connected phone may still be running, so keep its FPS adjustable.
+        CameraFrameRateBox.IsEnabled=!cleanupOnly && (!unavailable || appWindows.Windows.Any(window=>window.IsVirtualCamera));
+        VirtualCameraCompatibility.Text=!online ? "普通应用窗口需要 Android 10 或以上；虚拟摄像头需要 Android 16 或以上。" :
+            device!.ApiLevel is null ? "未能确认当前手机的 Android 版本，请刷新设备后重试。" :
+            device.ApiLevel<AndroidCompatibility.MinimumAppApi ? $"当前手机为 {device.AndroidVersionLabel}，不支持独立应用窗口；需要 Android 10 或以上。" :
+            unavailable ? $"当前手机为 {device.AndroidVersionLabel}，已自动禁用虚拟摄像头；应用列表、普通窗口和快捷方式仍可使用。" :
+            $"当前手机为 {device.AndroidVersionLabel}，支持虚拟摄像头。此开关保留为支持设备的默认设置。";
     }
     private void CameraFrameRate_ValueChanged(NumberBox sender,NumberBoxValueChangedEventArgs args) {
         if(!ready || windowShutdown.HasStarted || !double.IsFinite(args.NewValue))return;
