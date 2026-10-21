@@ -5,10 +5,12 @@
   #error SetupDir is required
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.1.3"
+  #define VersionFile FileOpen(SourcePath + "\..\VERSION")
+  #define AppVersion Trim(FileRead(VersionFile))
+  #expr FileClose(VersionFile)
 #endif
 #ifndef AppFileVersion
-  #define AppFileVersion "0.1.3.0"
+  #define AppFileVersion AppVersion + ".0"
 #endif
 
 [Setup]
