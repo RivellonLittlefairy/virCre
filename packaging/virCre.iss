@@ -1,14 +1,14 @@
-﻿#ifndef PublishDir
+#ifndef PublishDir
   #error PublishDir is required
 #endif
 #ifndef SetupDir
   #error SetupDir is required
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.1.1"
+  #define AppVersion "0.1.2"
 #endif
 #ifndef AppFileVersion
-  #define AppFileVersion "0.1.1.0"
+  #define AppFileVersion "0.1.2.0"
 #endif
 
 [Setup]

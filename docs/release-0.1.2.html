@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>virCre 0.1.2 更新说明</title><style>body{font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;max-width:960px;margin:36px auto;padding:0 24px 50px;color:#233b33}h1,h2{line-height:1.4}code{background:#eef3f0;padding:2px 5px;overflow-wrap:anywhere}li{margin:10px 0}a{color:#17684d}</style></head><body>
+<h1>virCre 0.1.2</h1><p>2026-10-21 · Windows x64 · 文件版本0.1.2.0</p>
+<p>这次主要修复虚拟摄像头用一会儿就停的问题。如果你遇到过相机突然黑屏，或者一直显示“PC INPUT PAUSED”，建议更新到这一版。</p>
+<h2>相机暂停与恢复</h2><ul>
+<li>移除了原来的10分钟会话限制，正常运行不再按时长自动结束。</li>
+<li>修复窗口靠近屏幕边缘、部分移出屏幕或跨屏时，画面停住后必须手动继续的问题。跨屏部分现在会按桌面位置拼接，屏幕外的部分补黑，保持原来的画面比例。</li>
+<li>最小化窗口、电脑锁屏或暂时采集失败时，程序等待画面恢复；还原窗口、解锁或恢复采集后会自动继续。你主动点击的“暂停”仍需手动继续。</li>
+<li>更新了设置页和提示，删掉过期的“每次最长10分钟”说明。补充采集恢复和退出阶段的日志，方便之后排查问题；日志不保存桌面图像、输入文字或剪贴板内容。</li>
+</ul>
+<h2>下载和升级</h2><ul>
+<li>安装版：下载<code>virCre-0.1.2-win-x64-setup.exe</code>。先关闭virCre和它打开的手机应用窗口，再运行安装器。默认安装位置与旧版相同，设置、应用缓存和图标保存在当前用户目录。</li>
+<li>便携版：下载<code>virCre-0.1.2-win-x64-portable.zip</code>，完整解压后启动<code>VirCre.Desktop.exe</code>。如果更换了解压位置，需要重新创建手机应用的桌面快捷方式。</li>
+<li><code>virCre-0.1.2-SHA256SUMS.txt</code>可用于核对下载文件。</li>
+</ul><p>支持Windows 10 2004（19041）及以上的x64系统，手机需要Android 16及以上，并已授权USB或无线调试。ADB、修改版scrcpy和桌面运行依赖都已内置。</p>
+<h2>目前还有的限制</h2>
+<p>同时只能打开一个启用虚拟摄像头的应用窗口。跨屏采集会增加电脑负载，实际帧率仍取决于电脑、手机和连接，多块屏幕的画面不保证在同一时刻采样。</p>
+<p>手机真正休眠或锁屏后，部分应用控件仍可能不响应点击。正常关闭应用窗口后，主界面偶尔仍会把连接结束显示成错误提示。这项提示问题尚未单独处理。</p>
+<p>安装包未做代码签名。包内继续附带项目许可证、第三方许可和对应源码材料。</p>
+<h2>验证说明</h2><p>修复版已由用户手动使用，反馈长时间运行未再报错；随后检查的那轮日志也没有新的采集异常。本次发布另做编译、版本和文件校验，不自动运行安装器或操作手机；全新Windows环境、覆盖升级和卸载仍需手动验收。</p>
+<p><a href="virtual-camera-window.html">虚拟摄像头使用说明</a> · <a href="windows-packaging.html">打包与安装说明</a> · <a href="camera-lifetime-fix.html">问题原因和修复记录</a> · <a href="release-0.1.1.html">0.1.1更新记录</a></p>
+</body></html>
