@@ -30,6 +30,7 @@ Compression=lzma2
 SolidCompression=yes
 OutputDir={#SetupDir}
 OutputBaseFilename=virCre-{#AppVersion}-win-x64-setup
+SetupIconFile={#PublishDir}\Assets\Brand\vircre.ico
 UninstallDisplayIcon={app}\VirCre.Desktop.exe
 CloseApplications=yes
 CloseApplicationsFilter=VirCre.Desktop.exe

@@ -10,9 +10,7 @@
         <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition Height="*" /></Grid.RowDefinitions>
         <Grid x:Name="TitleBar" Margin="20,0,140,0" Background="Transparent">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Border Width="24" Height="24" Background="#316D66" CornerRadius="7">
-                    <FontIcon Glyph="&#xE8A7;" FontSize="13" Foreground="White" />
-                </Border>
+                <Image Width="24" Height="24" Source="ms-appx:///Assets/Brand/vircre-icon-256.png" AutomationProperties.Name="virCre" />
                 <TextBlock Text="virCre" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <TextBlock Text="手机应用，桌面体验" FontSize="12" Margin="8,0,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
             </StackPanel>

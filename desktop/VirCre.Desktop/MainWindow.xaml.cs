@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window {
         model = new(settings: settings.Settings);
         catalogController = new(phone, model);
         InitializeComponent();
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory,"Assets","Brand","vircre.ico"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBar);
         Root.ActualThemeChanged += (_, _) => UpdateCaptionColors();

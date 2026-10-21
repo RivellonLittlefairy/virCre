@@ -13,11 +13,16 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/Brand/vircre.ico</ApplicationIcon>
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
     <ScrcpyRuntimeVariant Condition="'$(ScrcpyRuntimeVariant)' == ''">Official</ScrcpyRuntimeVariant>
   </PropertyGroup>
   <ItemGroup>
+    <!-- WinUI and the .NET SDK discover images automatically. Register runtime
+         brand assets once and keep the high-resolution design source out of publish. -->
+    <Content Remove="Assets/Brand/**/*" />
+    <Content Include="Assets/Brand/vircre.ico;Assets/Brand/vircre-icon-256.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />
     <ProjectReference Include="../VirCre.Presentation/VirCre.Presentation.csproj" />

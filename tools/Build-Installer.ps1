@@ -36,7 +36,7 @@ if(-not $SkipRuntimeBuild) {
 $publish=Join-Path $repo ('out\package-staging-'+[Guid]::NewGuid().ToString('N'))
 & (Join-Path $PSScriptRoot 'Publish-Desktop.ps1') -Runtime Custom -SkipTests -Version $Version -OutputDirectory $publish -GuidePage virtual-camera-window.html
 foreach($required in @('VirCre.Desktop.exe','VirCre.Desktop.dll','VirCre.Desktop.pri','VirCre.Desktop.runtimeconfig.json',
-    'Microsoft.UI.Xaml.dll','Assets\icon-agent.jar','runtime\scrcpy\scrcpy.exe','runtime\scrcpy\scrcpy-server',
+    'Microsoft.UI.Xaml.dll','Assets\icon-agent.jar','Assets\Brand\vircre.ico','Assets\Brand\vircre-icon-256.png','runtime\scrcpy\scrcpy.exe','runtime\scrcpy\scrcpy-server',
     'runtime\scrcpy\adb.exe','runtime\scrcpy\licenses','使用说明.html')) {
     if(-not (Test-Path -LiteralPath (Join-Path $publish $required))) {throw "Missing publish resource: $required"}
 }
