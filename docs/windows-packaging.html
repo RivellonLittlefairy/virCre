@@ -266,7 +266,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath $setup, $zip</code></pre>
       <li><strong>分发材料：</strong>确定主项目许可证，带上第三方许可和所需源码/构建材料；不要遗漏 <code>runtime/scrcpy/licenses</code>。</li>
     </ol>
     <p>代码签名不是本地生成 EXE 安装包的前提。公开分发时建议签名并加可信时间戳，便于用户确认发布者；签名本身不保证 SmartScreen 不提示。当前检查没有验证签名、干净系统安装、覆盖升级或设备功能。</p>
-    <p>安装器版本和应用程序集版本已由Build-Installer与Publish-Desktop的Version参数统一；0.1.3对应EXE文件版本0.1.3.0。后续升级应递增版本并验证固定目录、用户数据和快捷方式。</p>
+    <p>默认版本统一保存在项目根目录的<code>VERSION</code>文件中。<code>Directory.Build.props</code>让 .NET 项目读取该版本，发布脚本和安装器也从同一文件取值，界面从程序集元数据读取。更新版本时只需修改此文件；<code>-Version</code>仍可用于临时构建覆盖。本文出现的0.1.3是本次发布示例，对应EXE文件版本0.1.3.0。后续升级仍需验证固定目录、用户数据和快捷方式。</p>
   </section>
 
   <section id="sources">

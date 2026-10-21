@@ -161,7 +161,7 @@ $rtf='{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}\fs20 '+$escaped.Replace("`r",''
 # Whitelist version-controlled project/source roots. Never archive .git, credentials, local logs or build output.
 $paths=@((& git -C $repo -c core.quotepath=false ls-files --cached --others --exclude-standard -z) -join "`n") -split "`0"
 if($LASTEXITCODE -ne 0) {throw 'Cannot enumerate the matching source snapshot'}
-$paths=@($paths | Where-Object {$_ -match '^(desktop/|android-agent/|camera-agent/|tools/|packaging/|third_party/|LICENSE$|NOTICE$|THIRD-PARTY-NOTICES\.html$|README\.md$|\.gitattributes$|\.gitignore$|docs/(scrcpy-changes|license-compliance)\.html$)' -and
+$paths=@($paths | Where-Object {$_ -match '^(desktop/|android-agent/|camera-agent/|tools/|packaging/|third_party/|VERSION$|Directory\.Build\.props$|LICENSE$|NOTICE$|THIRD-PARTY-NOTICES\.html$|README\.md$|\.gitattributes$|\.gitignore$|docs/(scrcpy-changes|license-compliance)\.html$)' -and
     $_ -notmatch '(^|/)(bin|obj|build|\.cache|\.git|out)(/|$)' -and (Test-Path -LiteralPath (Join-Path $repo $_) -PathType Leaf)} | Sort-Object -Unique)
 $sourceZip=Join-Path $sources 'virCre-source.zip'
 Add-Type -AssemblyName System.IO.Compression.FileSystem

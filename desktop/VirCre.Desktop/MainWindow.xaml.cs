@@ -38,7 +38,9 @@ public sealed partial class MainWindow : Window {
         ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
         VirtualCameraToggle.IsOn=model.VirtualCameraEnabled;
         CameraFrameRateBox.Value=model.CameraFrameRate;
-        var appVersion=typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]??"0.1.3";
+        var assembly=typeof(MainWindow).Assembly;
+        var appVersion=assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+            ??assembly.GetName().Version?.ToString(3)??"未知版本";
         AboutVersion.Text="virCre "+appVersion;
         Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
         model.SettingsChanged += SaveSettings;

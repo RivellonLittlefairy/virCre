@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Explicit -p:Version overrides remain available for temporary builds. -->
+    <Version Condition="'$(Version)' == ''">$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</Version>
+  </PropertyGroup>
+</Project>

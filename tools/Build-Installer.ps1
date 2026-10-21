@@ -1,12 +1,13 @@
 #requires -Version 7.0
 param(
-    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version='0.1.3',
+    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version,
     [string]$Compiler,
     [string]$OutputDirectory,
     [switch]$SkipRuntimeBuild
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
+$Version=& (Join-Path $PSScriptRoot 'Get-ProjectVersion.ps1') -Version $Version
 $parsedVersion=[Version]$Version
 $patchVersion=[Math]::Max(0,$parsedVersion.Build)
 $expectedFileVersion="$($parsedVersion.Major).$($parsedVersion.Minor).$patchVersion.0"

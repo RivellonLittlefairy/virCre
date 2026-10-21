@@ -43,7 +43,7 @@ foreach($package in $manifest.packages) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $sourceArchive=[IO.Compression.ZipFile]::OpenRead((Join-Path $root 'compliance\sources\virCre-source.zip'))
 try {
-    foreach($required in @('LICENSE','NOTICE','third_party/scrcpy/LICENSE','tools/Build-Scrcpy.ps1',
+    foreach($required in @('LICENSE','NOTICE','VERSION','Directory.Build.props','tools/Get-ProjectVersion.ps1','third_party/scrcpy/LICENSE','tools/Build-Scrcpy.ps1',
         'third_party/scrcpy/app/deps/ffmpeg.sh','camera-agent/src/main/java/com/example/vircam/shell/ApplicationCameraSession.java')) {
         if(-not $sourceArchive.GetEntry($required)) {throw "Source snapshot is incomplete: $required"}
     }

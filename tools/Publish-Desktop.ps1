@@ -4,6 +4,7 @@ param([string]$OutputDirectory,[ValidateSet('Official','Custom')][string]$Runtim
     [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
+$Version=& (Join-Path $PSScriptRoot 'Get-ProjectVersion.ps1') -Version $Version
 if(-not $OutputDirectory) {
     $outputName=if($Runtime -eq 'Custom') {'out\desktop-ime-preview'} else {'out\desktop-release'}
     $OutputDirectory=Join-Path $repo $outputName

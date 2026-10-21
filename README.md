@@ -120,6 +120,8 @@ Windows 端使用 Windows Graphics Capture 采集显示器，投屏窗口通过�
 
 构建需要 .NET SDK 8、PowerShell 7、Android SDK API 36、Build Tools、JDK，以及 GCC、Meson、Ninja；制作 EXE 安装包还需 Inno Setup 6。完整命令和检查范围见 [Windows 打包说明](docs/windows-packaging.html)，内置组件的来源和修改见 [scrcpy 说明](docs/bundled-scrcpy.html)及[修改记录](docs/scrcpy-changes.html)。
 
+默认版本号统一保存在根目录的 `VERSION` 文件中，程序、安装器和发布脚本自动读取；界面使用程序集中的版本信息。更新默认版本时只需修改该文件，临时构建仍可通过 `-Version` 覆盖。
+
 ## 许可与第三方组件
 
 virCre 原创源码采用 [Apache License 2.0](LICENSE)，归属声明见 [NOTICE](NOTICE)。第三方源码和二进制组件保留各自的授权与适用条款。
