@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>virCre 0.1.3 更新说明</title>
+  <style>body{font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;max-width:960px;margin:36px auto;padding:0 24px 50px;color:#233b33}h1,h2{line-height:1.4}code{background:#eef3f0;padding:2px 5px;overflow-wrap:anywhere}li{margin:10px 0}a{color:#17684d}</style>
+</head>
+<body>
+  <h1>virCre 0.1.3</h1>
+  <p>2026-10-21 · Windows x64 · 文件版本 0.1.3.0</p>
+  <p>本版将普通应用窗口的兼容目标扩展至 Android 10，处理同一手机的双连接重复显示与相机关窗误报，并为桌面程序加入统一图标。</p>
+  <h2>更新内容</h2>
+  <ul>
+    <li>Android 10～15 手机自动使用普通应用窗口，虚拟摄像头会被禁用，设置页显示版本限制。应用列表和桌面快捷方式使用同一套判断；切换至 Android 16 手机后，仍保留原有相机设置。旧系统的实际兼容性仍需真机确认。</li>
+    <li>同一手机同时通过 USB 和无线 ADB 连接时，按已确认的硬件标识合并为一个设备，新窗口优先使用在线 USB 连接。刷新后保留所选手机，并复用该手机已有的应用窗口。已有会话不会在连接之间自动迁移；无法确认身份的连接不会仅凭机型合并。</li>
+    <li>修复主动关闭虚拟摄像头窗口时的错误提示：程序收到正常退出事件后先停止桌面采集，避免将随后断开的相机通道误判为异常。真实的非零退出码仍会保留。</li>
+    <li>新增蓝青色“窗口与手机”图标，统一用于 EXE、窗口、任务栏和安装器。手机应用快捷方式继续使用各应用自身的图标。</li>
+    <li>重写 README，前半部分说明连接、输入、快捷方式及相机使用，后半部分概括技术原理。发布文档仅收录已纳入 Git 的文件，避免包含本地未提交的设计草稿。</li>
+  </ul>
+  <h2>下载与升级</h2>
+  <ul>
+    <li>安装版：<code>virCre-0.1.3-win-x64-setup.exe</code>。先关闭 virCre 及其手机应用窗口，再运行安装器。默认安装到当前用户目录，通常不需要管理员权限。</li>
+    <li>便携版：<code>virCre-0.1.3-win-x64-portable.zip</code>。完整解压后启动 <code>VirCre.Desktop.exe</code>，请保留整个目录。更换程序位置后需重新创建手机应用快捷方式。</li>
+    <li>文件校验：<code>virCre-0.1.3-SHA256SUMS.txt</code>。</li>
+  </ul>
+  <p>电脑需要 Windows 10 2004（19041）及以上的 x64 系统。普通独立窗口以 Android 10（API 29）及以上为兼容目标，虚拟摄像头需要 Android 16（API 36）及以上。ADB、修改版 scrcpy 和桌面运行依赖均已内置。</p>
+  <p>设置、应用缓存和图标保存在当前用户的本地数据目录，卸载时默认保留。无线 ADB 仍需用户先完成配对和连接。</p>
+  <h2>已知限制与验证范围</h2>
+  <p>同时仅支持一个启用虚拟摄像头的应用窗口，实际相机帧率取决于电脑、手机和连接状况。应用窗口不转发手机声音。手机真正休眠或锁屏后，部分应用控件仍可能不响应输入。</p>
+  <p>本次发布执行编译、版本、图标资源和分发文件校验；发布包包含许可证、第三方许可及对应源码材料。未自动运行安装器、运行时测试或操作手机应用。Android 10～15、双连接合并、关窗提示，以及安装升级交互仍需手动确认。安装包未进行代码签名。</p>
+  <p><a href="android-compatibility.html">Android 版本兼容说明</a> · <a href="app-icon.html">图标设计说明</a> · <a href="virtual-camera-window.html">虚拟摄像头说明</a> · <a href="windows-packaging.html">Windows 打包说明</a> · <a href="release-0.1.2.html">0.1.2 更新说明</a></p>
+</body>
+</html>

@@ -1,6 +1,6 @@
 #requires -Version 7.0
 param(
-    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version='0.1.2',
+    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version='0.1.3',
     [string]$Compiler,
     [string]$OutputDirectory,
     [switch]$SkipRuntimeBuild

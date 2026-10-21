@@ -4,7 +4,7 @@ virCre 支持在 Windows 桌面以独立窗口操作 Android 手机应用，提�
 
 virCre 还支持将投屏窗口覆盖的桌面内容作为虚拟摄像头输入，供手机应用的扫一扫等相机功能读取。
 
-[下载最新版](https://github.com/RivellonLittlefairy/virCre/releases/latest) · [0.1.2 更新说明](docs/release-0.1.2.html)
+[下载最新版](https://github.com/RivellonLittlefairy/virCre/releases/latest) · [0.1.3 更新说明](docs/release-0.1.3.html)
 
 ## 使用说明
 
