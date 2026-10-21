@@ -23,6 +23,6 @@ public static class AndroidCompatibility {
         if (api < MinimumAppApi)
             throw new IOException("独立应用窗口需要 Android 10 或以上版本。");
         return new(device.Serial, device.Model, packageName, name,
-            virtualCameraEnabled && device.SupportsVirtualCamera, cameraFrameRate);
+            virtualCameraEnabled && device.SupportsVirtualCamera, cameraFrameRate) {HardwareId=device.HardwareId};
     }
 }

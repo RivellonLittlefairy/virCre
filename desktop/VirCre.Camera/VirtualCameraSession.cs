@@ -41,8 +41,14 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
     internal VirtualCameraSession(AppLaunchRequest request,BundledTools tools,Action<string>? inputDiagnostic,Action<string>? notice,Action<string>? diagnostic) {
         this.request=request;this.notice=notice;
         targetFrameRate=CameraFrameRates.Validate(request.CameraFrameRate);
-        phone=new(request,tools,diagnostic);scrcpy=new(tools,inputDiagnostic,phone.ObserveServerLine,phone.ObserveProcessExit);
+        phone=new(request,tools,diagnostic,ClientQuit);scrcpy=new(tools,inputDiagnostic,phone.ObserveServerLine,phone.ObserveProcessExit);
         lifetime=Task.Run(RunAsync);
+    }
+    private void ClientQuit() {
+        phone.RecordStage("desktop-client-quit-observed");
+        // Stop capture and pending frame ACK reads before normal server teardown closes
+        // their socket. Otherwise its EOF can incorrectly become session exit code 1.
+        try {stop.Cancel();}catch(ObjectDisposedException) when(exited) { }
     }
     public Task WaitForReadyAsync(CancellationToken token)=>ready.Task.WaitAsync(token);
     public Task WaitForExitAsync()=>completion.Task;
@@ -70,6 +76,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
             await PumpAsync(stop.Token).ConfigureAwait(false);
             phone.RecordStage("desktop-pump-ended");
         } catch(OperationCanceledException) when(stop.IsCancellationRequested) {ready.TrySetCanceled();}
+        catch(Exception e) when(stop.IsCancellationRequested && (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException)) {ready.TrySetCanceled();}
         catch(OperationCanceledException e) {
             exitCode=1;
             phone.RecordStage(ready.Task.IsCompletedSuccessfully?"desktop-frame-timeout":"desktop-startup-timeout");
@@ -124,6 +131,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
                     image=await capture.CaptureAsync(NativeHandle,token).ConfigureAwait(false);
                 } catch(OperationCanceledException) {throw;}
                 catch(Exception e) when(e is IOException or System.Runtime.InteropServices.COMException or ObjectDisposedException) {
+                    token.ThrowIfCancellationRequested();
                     capture?.Dispose();capture=null;
                     var previousStatus=Volatile.Read(ref status);
                     if(Volatile.Read(ref paused)!=0 || Volatile.Read(ref resumeVersion)!=version)continue;
@@ -138,6 +146,7 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
                     continue;
                 }
                 catch(Exception e) {
+                    token.ThrowIfCancellationRequested();
                     capture?.Dispose();capture=null;
                     Interlocked.Exchange(ref paused,1);
                     Volatile.Write(ref status,new(true,"已暂停："+e.Message));
@@ -177,7 +186,12 @@ internal sealed class VirtualCameraSession : IAppWindowProcess {
             frames?.Dispose();frames=null;
             var failures=new List<Exception>();
             if(window!=null) {
-                try {await window.CloseAsync().ConfigureAwait(false);window.Dispose();window=null;}
+                try {
+                    await window.CloseAsync().ConfigureAwait(false);
+                    // Preserve a real client failure even if a quit signal preceded it.
+                    if(window.ExitCode!=0)exitCode=window.ExitCode;
+                    window.Dispose();window=null;
+                }
                 catch(Exception e) {failures.Add(e);}
             }
             try {await phone.CleanupAsync().ConfigureAwait(false);}catch(Exception e) {failures.Add(e);}

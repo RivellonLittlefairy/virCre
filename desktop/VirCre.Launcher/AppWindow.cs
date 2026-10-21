@@ -1,7 +1,12 @@
 namespace VirCre.Launcher;
 
 public sealed record AppLaunchRequest(string Serial, string DeviceName, string PackageName, string Name,
-    bool UseVirtualCamera = false, int CameraFrameRate = CameraFrameRates.Default);
+    bool UseVirtualCamera = false, int CameraFrameRate = CameraFrameRates.Default) {
+    public string HardwareId {get;init;} = "";
+    public string DeviceIdentity => HardwareId.Length>0?"hardware:"+HardwareId:"transport:"+Serial;
+    public bool IsForDevice(PhoneDevice device) => HardwareId.Length>0 && device.HardwareId.Length>0
+        ? HardwareId==device.HardwareId : device.HasConnection(Serial);
+}
 public enum AppWindowState { Starting, Running, Closing, CloseFailed }
 public sealed record AppWindowInfo(Guid Id, AppLaunchRequest Request, AppWindowState State, int? DisplayId) {
     public string Name => Request.Name;

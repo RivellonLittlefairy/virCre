@@ -38,7 +38,7 @@ public sealed partial class MainWindow {
     }
     private AppLaunchRequest CreateLaunchRequest(PhoneDevice device,string packageName,string name) {
         // A changed default affects new windows; clicking an existing app still focuses its current mode.
-        return appWindows.Windows.FirstOrDefault(value=>value.Request.Serial==device.Serial && value.PackageName==packageName)?.Request
+        return appWindows.Windows.FirstOrDefault(value=>value.Request.IsForDevice(device) && value.PackageName==packageName)?.Request
             ?? AndroidCompatibility.CreateLaunchRequest(device,packageName,name,model.VirtualCameraEnabled,model.CameraFrameRate);
     }
     private async Task OpenCardAsync(AppCard card) {

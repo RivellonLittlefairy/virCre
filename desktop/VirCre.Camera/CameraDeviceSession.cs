@@ -8,7 +8,7 @@ using VirCre.Launcher;
 namespace VirCre.Camera;
 
 /// <summary>Owns one association and forward; identifies only its GUID-tagged bundled server for cleanup.</summary>
-internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools tools,Action<string>? diagnostic=null) {
+internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools tools,Action<string>? diagnostic=null,Action? clientQuit=null) {
     private const string MainClass="com.genymobile.scrcpy.Server";
     private readonly ICommandRunner runner=new CommandRunner(tools);
     private readonly string session=Guid.NewGuid().ToString("N");
@@ -90,6 +90,9 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
                 if(kind.GetString()=="shutdown-started")stage="phone-shutdown-started";
                 if(kind.GetString()=="host-close-requested")stage="desktop-window-close-requested";
                 if(kind.GetString()=="client-stop" && root.TryGetProperty("reason",out var stopReason)) {
+                    // These events confirm that the client accepted a normal quit. A native
+                    // close-button notification alone is not sufficient to end a session.
+                    if(stopReason.GetString() is "quit-event" or "quit-shortcut")clientQuit?.Invoke();
                     stage=stopReason.GetString() switch {
                         "quit-event"=>"client-quit-event", "quit-shortcut"=>"client-quit-shortcut",
                         "native-close"=>"client-native-close", "native-system-close"=>"client-native-system-close",

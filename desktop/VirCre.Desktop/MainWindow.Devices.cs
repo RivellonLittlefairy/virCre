@@ -36,7 +36,8 @@ public sealed partial class MainWindow {
         deviceScan?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         deviceScan = request;
-        var previous = (DevicePicker.SelectedItem as PhoneDevice)?.Serial;
+        var previousDevice=DevicePicker.SelectedItem as PhoneDevice;
+        var previous=previousDevice?.Serial;
         scanning = true;
         DevicePicker.IsEnabled = false;
         RefreshDevices.IsEnabled = false;
@@ -45,7 +46,9 @@ public sealed partial class MainWindow {
             RenderState();
             var devices = await phone.GetDevicesAsync(request.Token);
             if (closing || windowShutdown.HasStarted || generation != scanGeneration || request.IsCancellationRequested) return;
-            var selected = devices.FirstOrDefault(device => device.Serial == previous);
+            var selected = previousDevice is {HardwareId.Length:>0}
+                ? devices.FirstOrDefault(device=>device.HardwareId==previousDevice.HardwareId) : null;
+            selected ??= devices.FirstOrDefault(device=>previous!=null && device.HasConnection(previous));
             if (selected == null && devices.Count == 1) selected = devices[0];
             syncingDevices = true;
             try { DevicePicker.ItemsSource = devices; DevicePicker.SelectedItem = selected; }

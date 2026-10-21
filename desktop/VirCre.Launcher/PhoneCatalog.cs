@@ -14,7 +14,26 @@ public sealed partial class PhoneCatalog(ICommandRunner runner) : IPhoneCatalog 
             try {devices[i]=devices[i] with {HardwareId=await ShortcutRequest.GetHardwareIdAsync(runner,devices[i].Serial,token).ConfigureAwait(false)};}
             catch(Exception error) when(error is IOException or TimeoutException) { /* Directory discovery still works when an OEM hides its serial. */ }
         }
-        return devices;
+        return MergeConnections(devices);
+    }
+    public static IReadOnlyList<PhoneDevice> MergeConnections(IReadOnlyList<PhoneDevice> devices) {
+        var hardwareIds=devices.Where(device=>device.HardwareId.Length>0).Select(device=>device.HardwareId).ToHashSet(StringComparer.Ordinal);
+        // An unavailable USB transport may still be identified by its exact hardware
+        // serial when an online connection has confirmed that same ID. Never merge by model.
+        string Identity(PhoneDevice device)=>device.HardwareId.Length>0?device.HardwareId:
+            hardwareIds.Contains(device.Serial)?device.Serial:"";
+        return devices.GroupBy(device=>Identity(device) is {Length:>0} id?"hardware:"+id:"transport:"+device.Serial,StringComparer.Ordinal)
+            .Select(group=>{
+                var preferred=group.OrderByDescending(device=>device.State==DeviceState.Online)
+                    .ThenByDescending(device=>device.State==DeviceState.Unauthorized)
+                    .ThenBy(device=>device.IsNetworkConnection).ThenByDescending(device=>device.ApiLevel.HasValue)
+                    .ThenBy(device=>device.Serial,StringComparer.Ordinal).First();
+                return preferred with {
+                    HardwareId=Identity(preferred),
+                    ApiLevel=preferred.ApiLevel??group.FirstOrDefault(device=>device.State==DeviceState.Online && device.ApiLevel.HasValue)?.ApiLevel,
+                    ConnectionSerials=group.SelectMany(device=>device.ConnectionSerials.Prepend(device.Serial)).Distinct(StringComparer.Ordinal).ToArray()
+                };
+            }).ToArray();
     }
     public async Task<IReadOnlyList<PhoneApp>> GetAppsAsync(string serial, CancellationToken token) {
         if (!SerialPattern().IsMatch(serial)) throw new ArgumentException("设备序列号格式无效。", nameof(serial));

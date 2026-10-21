@@ -3,6 +3,9 @@ namespace VirCre.Launcher;
 public enum DeviceState { Online, Unauthorized, Offline }
 
 public sealed record PhoneDevice(string Serial, string Model, DeviceState State, string HardwareId = "", int? ApiLevel = null) {
+    public IReadOnlyList<string> ConnectionSerials {get;init;} = [];
+    public bool HasConnection(string serial) => Serial==serial || ConnectionSerials.Contains(serial,StringComparer.Ordinal);
+    public bool IsNetworkConnection => Serial.Contains(':') || Serial.EndsWith("._tcp",StringComparison.OrdinalIgnoreCase);
     public bool SupportsVirtualCamera => ApiLevel >= AndroidCompatibility.MinimumCameraApi;
     public string AndroidVersionLabel => ApiLevel switch {
         29 => "Android 10", 30 => "Android 11", 31 => "Android 12", 32 => "Android 12L",

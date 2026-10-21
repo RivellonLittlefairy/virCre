@@ -13,7 +13,7 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
         public Task? CloseWork {get;set;}
     }
     private readonly object sync = new();
-    private readonly Dictionary<(string Serial,string Package),Entry> entries = [];
+    private readonly Dictionary<(string Device,string Package),Entry> entries = [];
     private readonly CancellationTokenSource shutdown = new();
     private bool stopped;
     public event EventHandler? Changed;
@@ -26,12 +26,12 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
         Entry entry;bool reused;
         lock(sync) {
             if(stopped)throw new InvalidOperationException("程序正在退出，不能再打开应用。");
-            reused=entries.TryGetValue((request.Serial,request.PackageName),out entry!);
+            reused=entries.TryGetValue((request.DeviceIdentity,request.PackageName),out entry!);
             if(reused && entry.Request.UseVirtualCamera!=request.UseVirtualCamera)
                 throw new InvalidOperationException("此应用已用另一种模式打开，请先在运行中页面关闭，再切换模式。");
             if(reused && entry.State is AppWindowState.Closing or AppWindowState.CloseFailed)
                 throw new InvalidOperationException("上一个应用窗口尚未关闭，请在运行中页面完成关闭后重试。");
-            if(!reused) {entry=new(request);entries.Add((request.Serial,request.PackageName),entry);}
+            if(!reused) {entry=new(request);entries.Add((request.DeviceIdentity,request.PackageName),entry);}
         }
         if(!reused) {Notify();_ = StartAsync(entry,token);}
         await entry.Ready.Task.WaitAsync(token).ConfigureAwait(false);
@@ -129,7 +129,7 @@ public sealed class AppWindowManager(IAppWindowHost host, TimeSpan? startupTimeo
     }
     private void Remove(Entry entry) {
         lock(sync) {
-            var key=(entry.Request.Serial,entry.Request.PackageName);
+            var key=(entry.Request.DeviceIdentity,entry.Request.PackageName);
             if(entries.TryGetValue(key,out var current) && ReferenceEquals(current,entry))entries.Remove(key);
         }
         Notify();
