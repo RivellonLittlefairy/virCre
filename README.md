@@ -129,3 +129,7 @@ virCre 原创源码采用 [Apache License 2.0](LICENSE)，归属声明见 [NOTIC
 发布包的 `compliance/` 目录附带许可证、对应源码包和修改版项目源码快照。构建时会检查分发材料、依赖哈希及自定义运行时是否与源码匹配，缺失或不匹配时停止打包。
 
 [第三方许可、对应源码与库替换说明](THIRD-PARTY-NOTICES.html) · [许可处理与分发检查](docs/license-compliance.html) · [图标与快捷方式说明](docs/desktop-shortcuts.html)
+
+## 开发与发布
+
+日常发版使用 [一条命令发布说明](docs/releasing.html)，入口为 `tools/Release-Desktop.ps1`。安装包结构和底层构建命令见 [Windows 打包说明](docs/windows-packaging.html)。

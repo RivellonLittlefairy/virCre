@@ -18,16 +18,7 @@ foreach($entry in $lock.unchangedBinaries.GetEnumerator()) {
 # Fail on stale cached custom binaries: the source archive must describe the actual server/client build.
 $scrcpySource=Join-Path $repo 'third_party\scrcpy'
 if($runtimeRecord.distribution -eq 'vircre-source-build') {
-    $cameraSource=Join-Path $repo 'camera-agent\src\main\java\com\example\vircam'
-    $cameraFiles=@(Get-ChildItem -LiteralPath (Join-Path $cameraSource 'shell') -File -Filter '*.java')
-    foreach($name in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java')) {$cameraFiles+=Get-Item -LiteralPath (Join-Path $cameraSource "core\$name")}
-    $fingerprintLines=@(Get-ChildItem -LiteralPath $scrcpySource -File -Recurse | Sort-Object FullName | ForEach-Object {
-        [IO.Path]::GetRelativePath($scrcpySource,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-    })
-    $fingerprintLines+=@($cameraFiles | Sort-Object FullName | ForEach-Object {
-        [IO.Path]::GetRelativePath($repo,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-    })
-    $fingerprint=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($fingerprintLines -join "`n"))))
+    $fingerprint=& (Join-Path $PSScriptRoot 'Get-CustomRuntimeFingerprint.ps1')
     if($fingerprint -ne $runtimeRecord.sourceFingerprint) {throw 'The custom runtime is stale relative to its source snapshot. Rebuild with tools/Build-Scrcpy.ps1 first.'}
 }
 

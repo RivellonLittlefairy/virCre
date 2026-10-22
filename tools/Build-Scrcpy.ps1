@@ -97,13 +97,7 @@ try {
         $relative=[IO.Path]::GetRelativePath($runtimeDirectory,$_.FullName).Replace('\','/')
         $hashes[$relative]=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
     }
-    $sourceHashes=@(Get-ChildItem -LiteralPath $sourceDirectory -File -Recurse | Sort-Object FullName | ForEach-Object {
-        [IO.Path]::GetRelativePath($sourceDirectory,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-    })
-    $sourceHashes+=@($cameraSources | Sort-Object FullName | ForEach-Object {
-        [IO.Path]::GetRelativePath($repoDirectory,$_.FullName).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-    })
-    $sourceFingerprint=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
+    $sourceFingerprint=& (Join-Path $PSScriptRoot 'Get-CustomRuntimeFingerprint.ps1')
     $officialRecord=Get-Content -LiteralPath (Join-Path $officialDirectory 'runtime-manifest.json') -Raw | ConvertFrom-Json
     [ordered]@{version=$version;distribution='vircre-source-build';features=@('windows-ime-v1','window-capture-exclusion-v1','vdm-direct-encoder-v1','camera-hd-jpeg-v1','camera-display-size-v1','camera-live-move-v1');acceptance='pending-user-validation';sourceCommit=$officialRecord.sourceCommit;sourceFingerprint=$sourceFingerprint;buildType=$BuildType;androidMinApi=29;virtualCameraMinApi=36;compiler=((& $env:CC --version | Select-Object -First 1) -join '');files=$hashes} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runtimeDirectory 'runtime-manifest.json') -Encoding utf8
 } finally {

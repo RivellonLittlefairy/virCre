@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>virCre 日常发布：一条命令</title>
+<style>body{max-width:960px;margin:36px auto;padding:0 24px 50px;font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;color:#263449}h1,h2{line-height:1.4}h2{margin-top:30px;font-size:22px}a{color:#2765e8}pre{background:#172437;color:#f2f5fa;padding:16px;border-radius:8px;overflow:auto;font:14px/1.7 Consolas,monospace}code{overflow-wrap:anywhere}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e5eaf2;text-align:left;padding:10px;vertical-align:top}.note{padding:12px 16px;background:#f4f7fb}</style>
+</head>
+<body>
+<h1>日常发布：一条命令</h1>
+<p>入口是 <code>tools/Release-Desktop.ps1</code>。在仓库根目录使用 PowerShell 7 执行，直接在 main 上提交、构建并发布 GitHub Release。只需指定新版本号和本次更新内容。</p>
+<pre><code># 示例版本，不表示已经发布 0.3。逗号分隔多条更新内容。
+.\tools\Release-Desktop.ps1 -Version 0.3 -Changes '修复应用窗口问题','调整设置界面'
+
+# 只读预演：不会改版本、提交、构建、推送或发布。
+.\tools\Release-Desktop.ps1 -Version 0.3 -WhatIf</code></pre>
+<p>本机沿用既有 .NET 8、PowerShell 7、Android SDK/JDK、Inno Setup 和 GitHub CLI 配置。GitHub CLI 需已登录并有仓库写入权限。重新编译 scrcpy 时还需要已有 C/Meson 工具链。</p>
+<h2>默认做什么</h2>
+<ol>
+<li>确认位于 main、远端可快进，版本号未使用且高于 VERSION。按更新内容生成 HTML 版本说明，更新 VERSION 与 README 链接，提交代码。</li>
+<li>复用匹配当前源码的 Release scrcpy 缓存；源码指纹变化、缓存缺失或不兼容时自动重编。桌面程序只执行一次自包含 publish，随后生成安装器、便携 ZIP 和 SHA-256 文件。</li>
+<li>保留一次完整分发清单校验，并核对程序与安装器版本、文件校验值及包记录中的源码提交。main 和版本标签使用原子推送。</li>
+<li>先创建草稿 Release，再上传三个附件；只有 GitHub 返回的文件大小、状态和 SHA-256 均与本地一致后才公开，并设为最新版。</li>
+<li>输出最终 Release 链接。构建详细日志保存在 <code>.cache/releases/&lt;版本&gt;/build.log</code>，避免把长日志发送给助手。</li>
+</ol>
+<p>默认提交所有已跟踪文件的改动，以及 desktop、android-agent、camera-agent、tools、packaging、third_party 下的新源码文件。未跟踪的文档草稿不会自动加入；本地已有的 main-window-redesign.html、app-card-options.html 等草稿保持原状。新文档需显式加入：</p>
+<pre><code>.\tools\Release-Desktop.ps1 -Version 0.3 -Changes '更新说明' -Include docs/new-guide.html</code></pre>
+<p>若 <code>docs/release-&lt;版本&gt;.html</code> 已存在，脚本保留其内容；GitHub Release 的要点取自 <code>-Changes</code>。</p>
+<h2>省掉哪些步骤</h2>
+<table>
+<thead><tr><th>之前的操作</th><th>日常发布</th></tr></thead>
+<tbody>
+<tr><td>每次重新阅读架构、许可、打包文档，再拼接命令</td><td>只使用这份说明和固定脚本入口。</td></tr>
+<tr><td>额外跑一次 build，再做 publish</td><td>只做 publish；其本身包含编译。</td></tr>
+<tr><td>每次都重编 scrcpy</td><td>比较源码指纹，未变化就复用。改动构建脚本或工具链后用 -RebuildRuntime 强制重编。</td></tr>
+<tr><td>打包链多次重复校验同一份分发目录</td><td>只保留一次完整清单校验；许可收集、源码材料和关键文件检查继续保留。</td></tr>
+<tr><td>把便携 ZIP 和源码 ZIP 每个文件重新读出比对，逐像素检查图标</td><td>默认不做。需要逐文件比对便携 ZIP 时加 -DeepVerify。</td></tr>
+<tr><td>每次发版重新安排代码审查、多次查询 GitHub 状态</td><td>发布阶段不再重复审查；新功能开发时自行安排。上传阶段一次核对附件，最后确认最新版。</td></tr>
+<tr><td>自动运行安装器、启动程序或操作手机</td><td>不执行，仍由用户手动验收。</td></tr>
+</tbody>
+</table>
+<h2>失败后继续</h2>
+<pre><code>.\tools\Release-Desktop.ps1 -Version 0.3 -Resume</code></pre>
+<p>提交完成后，脚本在 <code>.cache/releases/&lt;版本&gt;/release.json</code> 保存仓库与提交编号。后续打包、推送或上传失败，可以在相同提交、已跟踪文件无改动的情况下继续。已完成且属于同一提交的包会被复用；已正确上传的附件跳过上传。草稿不会在附件缺失时公开，也不会覆盖已发布版本的附件。</p>
+<p>若错误发生在创建发布提交之前，还没有续传记录：先检查 <code>git status</code>，处理版本文件、暂存内容或 Git 提交错误后再执行。不要为了重试而盲目清空工作区。若代码本身需要修复并新增提交，使用新版本发布，或手动处理未公开的旧草稿。</p>
+<h2>给助手的固定执行约定</h2>
+<p class="note">用户要求发版时，确定版本号与简短更新要点后运行上述入口。默认不另跑 build、不重复完整 ZIP 比对、不重新启动代码审查代理、不读取历史会话重建流程。只在脚本报错时读取对应日志末尾并处理。除非本次另有明确要求，不调整仓库公开状态、不重做许可、不自动操作手机，不修改历史已发布附件。</p>
+<p>这份脚本已做 PowerShell 语法检查、源码指纹兼容检查和 -WhatIf 只读预演；新的一键流程尚未实际发布下一个版本。0.2 仍保留原发布内容，不为验证脚本再发一次。</p>
+<p><a href="windows-packaging.html">安装包结构与历史打包方案</a> · <a href="release-0.2.html">0.2 更新说明</a></p>
+</body>
+</html>

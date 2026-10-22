@@ -1,7 +1,7 @@
 #requires -Version 7.0
 param([string]$OutputDirectory,[ValidateSet('Official','Custom')][string]$Runtime='Official',[switch]$SkipTests,
     [ValidateSet('desktop-shortcuts.html','windows-ime-preview.html','virtual-camera-window.html')][string]$GuidePage,
-    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version)
+    [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version,[switch]$SkipComplianceVerification)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 $Version=& (Join-Path $PSScriptRoot 'Get-ProjectVersion.ps1') -Version $Version
@@ -37,6 +37,6 @@ $selectedGuide=if($GuidePage) {$GuidePage} elseif($Runtime -eq 'Custom') {'windo
 $guide='<meta charset="utf-8"><meta http-equiv="refresh" content="0;url=docs/'+$selectedGuide+'"><a href="docs/'+$selectedGuide+'">打开使用说明</a>'
 Set-Content -LiteralPath (Join-Path $OutputDirectory '使用说明.html') -Value $guide -Encoding utf8
 & (Join-Path $PSScriptRoot 'Prepare-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory
-& (Join-Path $PSScriptRoot 'Test-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory
+if(-not $SkipComplianceVerification) {& (Join-Path $PSScriptRoot 'Test-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory}
 Write-Output "Ready: $OutputDirectory\VirCre.Desktop.exe"
 Write-Output 'ADB and scrcpy are bundled in runtime\scrcpy. Keep the complete folder in a stable location before creating shortcuts.'

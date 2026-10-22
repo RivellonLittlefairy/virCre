@@ -35,7 +35,8 @@ if(-not $SkipRuntimeBuild) {
 }
 # Each run gets a clean staging directory. Never package the checkout, device logs or build caches.
 $publish=Join-Path $repo ('out\package-staging-'+[Guid]::NewGuid().ToString('N'))
-& (Join-Path $PSScriptRoot 'Publish-Desktop.ps1') -Runtime Custom -SkipTests -Version $Version -OutputDirectory $publish -GuidePage virtual-camera-window.html
+# The installer verifies the complete inventory once below, after its own file checks.
+& (Join-Path $PSScriptRoot 'Publish-Desktop.ps1') -Runtime Custom -SkipTests -Version $Version -OutputDirectory $publish -GuidePage virtual-camera-window.html -SkipComplianceVerification
 foreach($required in @('VirCre.Desktop.exe','VirCre.Desktop.dll','VirCre.Desktop.pri','VirCre.Desktop.runtimeconfig.json',
     'Microsoft.UI.Xaml.dll','Assets\icon-agent.jar','Assets\Brand\vircre.ico','Assets\Brand\vircre-icon-256.png','runtime\scrcpy\scrcpy.exe','runtime\scrcpy\scrcpy-server',
     'runtime\scrcpy\adb.exe','runtime\scrcpy\licenses','使用说明.html')) {
