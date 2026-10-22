@@ -17,24 +17,8 @@ public sealed partial class MainWindow {
         CloseIdleShortcutSession();
     });
     private void AppWindows_Problem(string message) => DispatcherQueue.TryEnqueue(() => ShowAction(message, true));
-    private void ShowAction(string message, bool error = false) {
-        if (closing) return;
-        // A shortcut-only session has no visible launcher to display failures.
-        if(error && shortcutOnly)ShowLauncher();
-        ActionNotice.Severity = error ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
-        ActionNotice.Title = message;
-        ActionNotice.ActionButton = null;
-        ActionNotice.IsOpen = true;
-    }
     private async void OpenApp_Click(object sender, RoutedEventArgs args) {
         if ((sender as Button)?.Tag is AppCard card) await OpenCardAsync(card);
-    }
-    private async void AppCard_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args) {
-        // Buttons own their clicks, including favorites. A double click there must not launch the card.
-        for (var current = args.OriginalSource as DependencyObject; current != null && !ReferenceEquals(current, sender); current = VisualTreeHelper.GetParent(current))
-            if (current is Button) return;
-        args.Handled = true;
-        if ((sender as FrameworkElement)?.Tag is AppCard card) await OpenCardAsync(card);
     }
     private AppLaunchRequest CreateLaunchRequest(PhoneDevice device,string packageName,string name) {
         // A changed default affects new windows; clicking an existing app still focuses its current mode.

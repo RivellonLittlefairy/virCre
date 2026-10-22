@@ -10,6 +10,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     private readonly HashSet<string> favorites = new(StringComparer.Ordinal);
     private readonly ObservableCollection<AppCard> visible = [];
     private readonly ObservableCollection<AppWindowInfo> running = [];
+    private readonly ObservableCollection<RunningWindowCard> runningCards = [];
+    private readonly Dictionary<Guid,AppCard> windowArtwork = [];
+    private PhoneDevice? currentDevice;
     public ShellViewModel(bool preview = false, UserSettings? settings = null) {
         IsPreview = preview;
         catalog = preview ? [.. DemoCatalog.Create()] : [];
@@ -17,7 +20,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
             favorites.UnionWith(settings.Favorites);Theme = settings.Theme;
             VirtualCameraEnabled=settings.VirtualCameraEnabled;CameraFrameRate=CameraFrameRates.Normalize(settings.CameraFrameRate);
         }
-        Apps = new(visible);Running = new(running);Refresh();
+        Apps = new(visible);Running = new(running);RunningCards = new(runningCards);Refresh();
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? SettingsChanged;
@@ -38,6 +41,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     }
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
     public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
+    public ReadOnlyObservableCollection<RunningWindowCard> RunningCards {get;}
     public string CurrentSerial {get;private set;} = "";
     public bool IsPreview {get;private set;}
     public bool HasDevice {get;private set;}
@@ -48,6 +52,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string Page {get;private set;} = "apps";
     public bool IsEmpty => Page=="running" ? running.Count==0 : visible.Count==0;
     public string ResultCount => $"{visible.Count} 个{(IsPreview ? "示例" : "")}应用";
+    public int CatalogCount => catalog.Count;
+    public int FavoriteCount => catalog.Count(app => app.IsFavorite);
+    public int RunningCount => running.Count;
     public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
     public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
         IsLoading ? $"正在从 {DeviceLabel} 读取应用列表…" : ErrorMessage.Length > 0 ? ErrorMessage :
@@ -62,10 +69,10 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public string EmptyTitle => Page == "running" ? "还没有打开的应用" : IsLoading ? "正在读取手机应用" :
         ErrorMessage.Length > 0 ? "暂时无法读取应用" : !HasDevice && !IsPreview ? "连接你的手机" :
         Query.Trim().Length > 0 ? "没有找到匹配的应用" : Page == "favorites" ? "把常用应用放在这里" : "没有可启动的应用";
-    public string EmptyDescription => Page == "running" ? "双击应用卡片或点击打开，即可在这里管理独立窗口。" :
+    public string EmptyDescription => Page == "running" ? "点击应用卡片打开后，即可在这里管理独立窗口。" :
         IsLoading ? "首次读取可能需要一些时间，请保持手机连接。" : ErrorMessage.Length > 0 ? ErrorMessage :
-        !HasDevice && !IsPreview ? "在左侧选择已授权的手机，或点击刷新设备。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
-        Page == "favorites" ? "点击应用卡片右上角的星标，收藏将在重启后保留。" : "点击刷新，重新读取手机上的应用。";
+        !HasDevice && !IsPreview ? "连接并授权后，手机里的应用就会出现在这里。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
+        Page == "favorites" ? "点击应用卡片右侧的星标，收藏将在重启后保留。" : "点击刷新，重新读取手机上的应用。";
 
     public void Navigate(string page) {
         if(page is not ("apps" or "favorites" or "running" or "settings"))return;
@@ -78,6 +85,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         catalog[index]=catalog[index] with {IsFavorite=favorites.Contains(packageName)};Refresh();SettingsChanged?.Invoke();
     }
     internal void BeginLoad(PhoneDevice? device) {
+        currentDevice=device;
         IsPreview=false;catalog.Clear();Query="";
         DeviceLabel=device?.Model??"未选择设备";
         CurrentSerial=device?.Serial??"";
@@ -103,7 +111,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     }
     public void UpdateWindows(IReadOnlyList<AppWindowInfo> windows) {
         running.Clear();foreach(var window in windows)running.Add(window);
-        NotifyState();
+        Refresh();
     }
     private static string AppColor(string packageName) {
         string[] colors=["#507C93","#8576A6","#548D8A","#A86F73","#B58A4C","#697E99","#768B6F"];
@@ -111,14 +119,38 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         return colors[(int)(hash%(uint)colors.Length)];
     }
     private void Refresh() {
-        var query=Query.Trim();visible.Clear();
-        if(Page is "apps" or "favorites")foreach(var app in catalog.Where(app=>(Page!="favorites"||app.IsFavorite)&&
-            (app.Name.Contains(query,StringComparison.OrdinalIgnoreCase)||app.PackageName.Contains(query,StringComparison.OrdinalIgnoreCase))))visible.Add(app);
+        foreach(var id in windowArtwork.Keys.Where(id=>!running.Any(window=>window.Id==id)).ToArray())windowArtwork.Remove(id);
+        var rows=new List<RunningWindowCard>();
+        foreach(var window in running) {
+            var artwork=currentDevice!=null && window.Request.IsForDevice(currentDevice)?catalog.FirstOrDefault(app=>app.PackageName==window.PackageName):null;
+            if(artwork!=null)windowArtwork[window.Id]=artwork;
+            windowArtwork.TryGetValue(window.Id,out var savedArtwork);
+            rows.Add(new(window,savedArtwork?.IconPath,savedArtwork?.Color??AppColor(window.PackageName)));
+        }
+        if(runningCards.Count==rows.Count && runningCards.Select(card=>card.Window.Id).SequenceEqual(rows.Select(card=>card.Window.Id))) {
+            for(var index=0;index<rows.Count;index++)if(runningCards[index]!=rows[index])runningCards[index]=rows[index];
+        } else {
+            runningCards.Clear();foreach(var card in rows)runningCards.Add(card);
+        }
+        for(var index=0;index<catalog.Count;index++) {
+            var app=catalog[index];
+            var window=currentDevice==null?null:running.FirstOrDefault(value=>value.PackageName==app.PackageName && value.Request.IsForDevice(currentDevice));
+            catalog[index]=app with {IsRunning=window?.CanFocus==true,WindowState=window==null?"":window.CanFocus?"运行中 · 切回":window.StateLabel};
+        }
+        var query=Query.Trim();
+        var next=Page is "apps" or "favorites"?catalog.Where(app=>(Page!="favorites"||app.IsFavorite)&&
+            (app.Name.Contains(query,StringComparison.OrdinalIgnoreCase)||app.PackageName.Contains(query,StringComparison.OrdinalIgnoreCase))).ToArray():[];
+        // Window updates should not discard every realized card or reset scroll/focus.
+        if(visible.Count==next.Length && visible.Select(app=>(app.SourceSerial,app.PackageName)).SequenceEqual(next.Select(app=>(app.SourceSerial,app.PackageName)))) {
+            for(var index=0;index<next.Length;index++)if(visible[index]!=next[index])visible[index]=next[index];
+        } else {
+            visible.Clear();foreach(var app in next)visible.Add(app);
+        }
         NotifyState();
     }
     private void NotifyState() {
         foreach(var property in new[]{nameof(Page),nameof(Query),nameof(Title),nameof(Description),nameof(IsEmpty),nameof(ResultCount),nameof(EmptyTitle),nameof(EmptyDescription),
-            nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ErrorMessage),nameof(FooterText)})
+            nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ErrorMessage),nameof(FooterText),nameof(CatalogCount),nameof(FavoriteCount),nameof(RunningCount)})
             PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(property));
     }
 }

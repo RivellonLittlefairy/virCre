@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>virCre 0.2 更新说明</title>
+<style>body{font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;max-width:960px;margin:36px auto;padding:0 24px 50px;color:#263449}h1,h2{line-height:1.4}code{background:#f1f4f8;padding:2px 5px;overflow-wrap:anywhere}li{margin:10px 0}a{color:#2765e8}</style>
+</head>
+<body>
+<h1>virCre 0.2</h1>
+<p>2026-10-22 · Windows x64 · 文件版本 0.2.0.0</p>
+<p>本版重新设计桌面主界面。应用改为横向卡片，设备选择移到顶部，消息提示与底部设备状态共用一行。</p>
+<h2>更新内容</h2>
+<ul>
+<li>主窗口默认尺寸调整为 960 × 600，左侧导航显示全部应用、收藏和运行窗口数量，设置入口位于侧栏底部。顶部集中显示所选手机、Android 版本、连接方式和刷新按钮。</li>
+<li>应用列表默认显示三列横向卡片，列数随窗口宽度调整。卡片展示手机应用图标、名称和打开提示；包名放在悬停提示中，仍可按应用名称或包名搜索。</li>
+<li>单击卡片即可打开应用，已经打开的应用可直接切回现有窗口。右侧收藏按钮独立操作，除此之外的卡片区域都可点击打开，也可按住鼠标拖出创建快捷方式。</li>
+<li>去掉卡片悬停、按压和列表过渡效果，搜索框改为均匀细边框。设备栏、应用区和底部状态栏使用统一底色，浅色和深色主题同步调整。</li>
+<li>消息直接显示在底部状态栏，不再额外占用应用列表空间。普通提示 6 秒后恢复最新设备状态，错误和带操作按钮的消息保留到关闭或被新消息替换；长消息可悬停查看完整内容。</li>
+<li>运行中页面显示已缓存的应用图标，保留切回、关闭和相机画面控制。启动仍优先使用应用缓存，安装、卸载或更新应用后再手动刷新。</li>
+</ul>
+<h2>下载与升级</h2>
+<ul>
+<li>安装版：<code>virCre-0.2-win-x64-setup.exe</code>。升级前请关闭 virCre 及其打开的手机应用窗口，然后运行安装器。</li>
+<li>便携版：<code>virCre-0.2-win-x64-portable.zip</code>。完整解压后启动 <code>VirCre.Desktop.exe</code>，请保留整个目录。移动程序目录后，需要重新创建手机应用快捷方式。</li>
+<li>文件校验：<code>virCre-0.2-SHA256SUMS.txt</code>。</li>
+</ul>
+<p>系统要求保持不变：Windows 10 2004（19041）及以上的 x64 系统；普通应用窗口以 Android 10（API 29）及以上为兼容目标，虚拟摄像头需要 Android 16（API 36）及以上。ADB、修改版 scrcpy、.NET 和 WinUI 运行依赖已内置。</p>
+<p>本版沿用 0.1.3 的手机运行时，保留电脑中文输入、应用缓存、桌面快捷方式和虚拟摄像头功能。设置与缓存仍保存在当前 Windows 用户的本地数据目录。</p>
+<h2>验证范围与现有限制</h2>
+<p>发布过程检查 Release 编译、安装器生成、程序和安装器版本、分发文件及对应源码材料。不自动运行安装器、运行时测试或手机应用；界面交互、安装升级及设备兼容性由用户手动验证。安装包未进行代码签名。</p>
+<p>目前同时仅支持一个启用虚拟摄像头的应用窗口，应用窗口不转发手机声音。手机真正休眠或锁屏后，部分应用控件仍可能不响应输入；Android 10～15 的具体兼容性仍需真机确认。</p>
+<p><a href="main-window-redesign-implementation.html">主窗口改版实现说明</a> · <a href="virtual-camera-window.html">虚拟摄像头说明</a> · <a href="windows-packaging.html">Windows 打包说明</a> · <a href="release-0.1.3.html">上一版更新说明</a></p>
+</body>
+</html>

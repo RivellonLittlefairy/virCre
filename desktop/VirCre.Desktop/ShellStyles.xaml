@@ -1,0 +1,150 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="ShellPaper" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ShellSidebar" Color="#F7F9FC" />
+            <SolidColorBrush x:Key="ShellField" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ShellSoft" Color="#F4F7FB" />
+            <SolidColorBrush x:Key="ShellInk" Color="#202A3C" />
+            <SolidColorBrush x:Key="ShellMuted" Color="#647087" />
+            <SolidColorBrush x:Key="ShellLine" Color="#E5EAF2" />
+            <SolidColorBrush x:Key="ShellAccent" Color="#2765E8" />
+            <SolidColorBrush x:Key="ShellTint" Color="#EAF1FF" />
+            <SolidColorBrush x:Key="ShellGreen" Color="#178568" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#F7F9FC" />
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#E5EAF2" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#EAF1FF" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#EAF1FF" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="#2765E8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#EAF1FF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#EAF1FF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#2765E8" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#2765E8" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <SolidColorBrush x:Key="ShellPaper" Color="#1A2230" />
+            <SolidColorBrush x:Key="ShellSidebar" Color="#171E2B" />
+            <SolidColorBrush x:Key="ShellField" Color="#1A2230" />
+            <SolidColorBrush x:Key="ShellSoft" Color="#222D3E" />
+            <SolidColorBrush x:Key="ShellInk" Color="#EDF2FC" />
+            <SolidColorBrush x:Key="ShellMuted" Color="#9EABC1" />
+            <SolidColorBrush x:Key="ShellLine" Color="#2D384C" />
+            <SolidColorBrush x:Key="ShellAccent" Color="#91B5FF" />
+            <SolidColorBrush x:Key="ShellTint" Color="#253A5C" />
+            <SolidColorBrush x:Key="ShellGreen" Color="#71D9B4" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#171E2B" />
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#1A2230" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#2D384C" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#253A5C" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#253A5C" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="#91B5FF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#253A5C" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#253A5C" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#91B5FF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#91B5FF" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="ShellPaper" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ShellSidebar" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ShellField" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ShellSoft" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="ShellInk" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="ShellMuted" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="ShellLine" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="ShellAccent" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="ShellTint" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="ShellGreen" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="{ThemeResource SystemColorHotlightColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+    <Style x:Key="ShellHint" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource ShellMuted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="ShellQuietButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{ThemeResource ShellMuted}" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Surface.Background" Value="{ThemeResource ShellSoft}" /></VisualState.Setters></VisualState>
+                                <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Surface.Background" Value="{ThemeResource ShellTint}" /></VisualState.Setters></VisualState>
+                                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Surface.Opacity" Value="0.45" /></VisualState.Setters></VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="CardOpenButton" TargetType="Button" BasedOn="{StaticResource ShellQuietButton}">
+        <Setter Property="Foreground" Value="{ThemeResource ShellInk}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Padding" Value="10,8,60,8" />
+        <Setter Property="CornerRadius" Value="13" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Surface" Background="Transparent" CornerRadius="{TemplateBinding CornerRadius}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver" />
+                                <VisualState x:Name="Pressed" />
+                                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Surface.Opacity" Value="0.45" /></VisualState.Setters></VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="AppCardContainer" TargetType="GridViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="5,0,5,10" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridViewItem">
+                    <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

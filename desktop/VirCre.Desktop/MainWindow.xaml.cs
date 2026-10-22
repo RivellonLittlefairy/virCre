@@ -2,6 +2,8 @@ using Microsoft.UI.Windowing;
 using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using VirCre.Launcher;
 using VirCre.Presentation;
 using Windows.Graphics;
 using Windows.UI;
@@ -31,10 +33,10 @@ public sealed partial class MainWindow : Window {
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory,"Assets","Brand","vircre.ico"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBar);
-        Root.ActualThemeChanged += (_, _) => UpdateCaptionColors();
+        Root.ActualThemeChanged += (_, _) => {UpdateCaptionColors();RenderState();};
         model.PropertyChanged += (_, _) => RenderState();
         AppGrid.ItemsSource = model.Apps;
-        RunningList.ItemsSource = model.Running;
+        RunningList.ItemsSource = model.RunningCards;
         ThemeChoice.SelectedIndex = model.Theme switch {"Light"=>1,"Dark"=>2,_=>0};
         VirtualCameraToggle.IsOn=model.VirtualCameraEnabled;
         CameraFrameRateBox.Value=model.CameraFrameRate;
@@ -53,6 +55,7 @@ public sealed partial class MainWindow : Window {
         AppWindow.Closing += AppWindow_Closing;
         Closed += (_, _) => {
             closing = true;
+            statusMessageTimer?.Stop();
             lifetime.Cancel();
             catalogController.Dispose();
             appWindows.Changed -= AppWindows_Changed;
@@ -68,6 +71,7 @@ public sealed partial class MainWindow : Window {
         if (allowClose) return;
         args.Cancel = true;
         if (closing) return;
+        ClearStatusMessage();
         closing = true;
         Root.IsHitTestVisible = false;
         Navigation.IsEnabled = false;
@@ -112,7 +116,7 @@ public sealed partial class MainWindow : Window {
         observedRoot.Changed += XamlRoot_Changed;
         var scale = Root.XamlRoot.RasterizationScale;
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary)?.WorkArea;
-        AppWindow.Resize(new SizeInt32(Math.Min((int)(1120 * scale),workArea?.Width??int.MaxValue), Math.Min((int)(760 * scale),workArea?.Height??int.MaxValue)));
+        AppWindow.Resize(new SizeInt32(Math.Min((int)(960 * scale),workArea?.Width??int.MaxValue), Math.Min((int)(600 * scale),workArea?.Height??int.MaxValue)));
         UpdateMinimumSize();
         if (DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary) is { } display) {
             var area = display.WorkArea;
@@ -128,8 +132,8 @@ public sealed partial class MainWindow : Window {
         minimumScale = scale;
         if (AppWindow.Presenter is OverlappedPresenter presenter) {
             var area=DisplayArea.GetFromWindowId(AppWindow.Id,DisplayAreaFallback.Primary)?.WorkArea;
-            presenter.PreferredMinimumWidth = Math.Min((int)Math.Ceiling(900 * scale),area?.Width??int.MaxValue);
-            presenter.PreferredMinimumHeight = Math.Min((int)Math.Ceiling(600 * scale),area?.Height??int.MaxValue);
+            presenter.PreferredMinimumWidth = Math.Min((int)Math.Ceiling(720 * scale),area?.Width??int.MaxValue);
+            presenter.PreferredMinimumHeight = Math.Min((int)Math.Ceiling(520 * scale),area?.Height??int.MaxValue);
         }
     }
 
@@ -145,15 +149,41 @@ public sealed partial class MainWindow : Window {
     }
     private void Favorite_Click(object sender, RoutedEventArgs e) {
         if(windowShutdown.HasStarted)return;
-        if ((sender as Button)?.Tag is string packageName) model.ToggleFavorite(packageName);
+        if ((sender as FrameworkElement)?.Tag is string packageName) model.ToggleFavorite(packageName);
     }
     private void AppGrid_SizeChanged(object sender, SizeChangedEventArgs e) {
         if (AppGrid.ItemsPanelRoot is ItemsWrapGrid panel && e.NewSize.Width > 0) {
-            // Reserve the scroll gutter and each container's 6 px margins on both sides.
+            // Reserve the scroll gutter and each container's 5 px margins on both sides.
             var available = Math.Max(1, e.NewSize.Width - 16);
-            var columns = Math.Max(1, (int)(available / 242));
-            panel.ItemWidth = Math.Max(1, Math.Floor(available / columns) - 12);
+            var columns = Math.Max(1, (int)(available / 220));
+            panel.ItemWidth = Math.Max(1, Math.Floor(available / columns));
         }
+    }
+    private void ContentArea_SizeChanged(object sender, SizeChangedEventArgs args) {
+        var compact=Root.ActualWidth<820;
+        ContentArea.Padding=compact?new Thickness(18,22,18,0):new Thickness(28,24,28,0);
+        RefreshLabel.Visibility=compact?Visibility.Collapsed:Visibility.Visible;
+        SearchBox.Width=Math.Max(100,Math.Min(345,args.NewSize.Width-ContentArea.Padding.Left-ContentArea.Padding.Right-140));
+    }
+    private async void EmptyAction_Click(object sender,RoutedEventArgs args) {
+        if(windowShutdown.HasStarted)return;
+        if(model.Page=="running") {
+            Navigation.SelectedItem=Navigation.MenuItems[0];
+            model.Navigate("apps");
+        }
+        else if(!model.HasDevice || model.ErrorMessage.Length>0 || model.Page=="apps" && model.Query.Length==0)
+            await RefreshDevicesAsync(forceRefresh:true);
+        else if(model.Query.Length>0)model.Search("");
+        else {
+            Navigation.SelectedItem=Navigation.MenuItems[0];
+            model.Navigate("apps");
+        }
+    }
+    private Brush StatusBrush(bool connected) {
+        var contrast=new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
+        var theme=contrast?"HighContrast":Root.ActualTheme==ElementTheme.Dark?"Default":"Light";
+        var resources=(ResourceDictionary)Application.Current.Resources.MergedDictionaries[1].ThemeDictionaries[theme];
+        return (Brush)resources[connected?"ShellGreen":"ShellMuted"];
     }
     private void Theme_SelectionChanged(object sender, SelectionChangedEventArgs e) {
         if (!ready || windowShutdown.HasStarted) return;
@@ -171,12 +201,19 @@ public sealed partial class MainWindow : Window {
         if (!ready || closing) return;
         var cleanupOnly=windowShutdown.HasStarted;
         PageTitle.Text = model.Title;
-        PageDescription.Text = model.Description;
+        PageTitle.Visibility=model.Page is "settings" or "running"?Visibility.Visible:Visibility.Collapsed;
         AppCount.Text = model.ResultCount;
-        DeviceName.Text = model.DeviceLabel;
-        DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" : model.DeviceStatus;
+        AllNavCount.Text=model.CatalogCount.ToString();
+        FavoriteNavCount.Text=model.FavoriteCount.ToString();
+        RunningNavCount.Text=model.RunningCount.ToString();
+        var device=DevicePicker.SelectedItem as PhoneDevice;
+        DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" :
+            device is {State:DeviceState.Online}?$"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}":"连接后选择设备";
         ConnectionStatus.Text = cleanupOnly?"等待退出":model.DeviceStatus;
-        FooterStatus.Text = cleanupOnly?"数据读取已停止，可管理剩余应用窗口后重试关闭。":model.FooterText;
+        var statusBrush=StatusBrush(!cleanupOnly && model.HasDevice && model.ErrorMessage.Length==0);
+        ConnectionDot.Fill=FooterDot.Fill=statusBrush;
+        ConnectionStatus.Foreground=statusBrush;
+        RenderFooter();
         LoadingRing.IsActive = cleanupOnly?windowShutdown.IsStopping:model.IsLoading || scanning;
         SearchBox.IsEnabled = !cleanupOnly && !model.IsLoading && model.HasDevice;
         DevicePicker.IsEnabled=!cleanupOnly && !scanning;
@@ -188,11 +225,14 @@ public sealed partial class MainWindow : Window {
         EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;
         EmptyDescription.Text = scanning ? "正在检查已授权的 ADB 设备。" : model.EmptyDescription;
         if (SearchBox.Text != model.Query) SearchBox.Text = model.Query;
-        EmptyIcon.Glyph = model.Page == "running" ? "\uE7F4" : model.Page == "favorites" ? "\uE734" : "\uE721";
+        EmptyIcon.Glyph = model.Page == "running" ? "\uE7F4" : !model.HasDevice?"\uE8EA":model.Page == "favorites" ? "\uE734" : "\uE721";
+        EmptySteps.Visibility=!model.HasDevice && model.Page is "apps" or "favorites"?Visibility.Visible:Visibility.Collapsed;
+        EmptyAction.Content=model.Page=="running"?"查看全部应用":!model.HasDevice || model.ErrorMessage.Length>0?"刷新设备":model.Query.Length>0?"清空搜索":model.Page=="favorites"?"查看全部应用":"刷新设备与应用";
+        EmptyAction.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading;
         var settings = model.Page == "settings";
         var running = model.Page == "running";
         SettingsContent.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
-        SearchRow.Visibility = settings || running ? Visibility.Collapsed : Visibility.Visible;
+        SearchRow.Visibility = settings || running || !model.HasDevice && model.CatalogCount==0 ? Visibility.Collapsed : Visibility.Visible;
         AppGrid.Visibility = settings || model.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
         if (running) AppGrid.Visibility = Visibility.Collapsed;
         RunningList.Visibility = running && !model.IsEmpty ? Visibility.Visible : Visibility.Collapsed;

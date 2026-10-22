@@ -83,7 +83,7 @@ public sealed partial class MainWindow {
                         RuntimeDiagnostics.Write("shortcut-folder-opened",details:created.Path);
                     } catch(Exception error) {RuntimeDiagnostics.Write("shortcut-folder-open-failed",error,created.Path);ShowAction("打开文件夹失败："+error.Message,true);}
                 };
-                ActionNotice.ActionButton=reveal;
+                SetStatusAction(reveal);
             }
         } catch(Exception error) {RuntimeDiagnostics.Write("shortcut-create-failed",error);ShowAction("创建快捷方式失败："+error.Message,true);}
     }

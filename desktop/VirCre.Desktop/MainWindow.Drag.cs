@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using VirCre.Launcher;
@@ -9,7 +10,8 @@ using Windows.Foundation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
-    private sealed class DragGesture(uint pointer,Point origin,object ticket) {
+    private sealed class DragGesture(UIElement source,uint pointer,Point origin,object ticket) {
+        public UIElement Source {get;}=source;
         public uint Pointer {get;}=pointer;
         public Point Origin {get;}=origin;
         public bool Preparing {get;set;}
@@ -19,18 +21,45 @@ public sealed partial class MainWindow {
     private DragGesture? dragGesture;
     private readonly Dictionary<string,Task<ShortcutCreation>> dragFiles=[];
     private Task nativeDragTask=Task.CompletedTask;
+    private Dictionary<RoutedEvent,PointerEventHandler>? cardPointerHandlers;
+    private Dictionary<RoutedEvent,PointerEventHandler> CardPointerHandlers => cardPointerHandlers??=new() {
+        [UIElement.PointerPressedEvent]=AppCard_PointerPressed,
+        [UIElement.PointerMovedEvent]=AppCard_PointerMoved,
+        [UIElement.PointerReleasedEvent]=AppCard_PointerReleased,
+        [UIElement.PointerCanceledEvent]=AppCard_PointerReleased,
+        [UIElement.PointerCaptureLostEvent]=AppCard_PointerCaptureLost
+    };
+
+    private void AppCard_Loaded(object sender,RoutedEventArgs args) {
+        if(sender is not UIElement source)return;
+        // Button handles pointer events itself. Observe them without stealing its
+        // capture until movement has actually crossed the shortcut drag threshold.
+        foreach(var (routedEvent,handler) in CardPointerHandlers)source.AddHandler(routedEvent,handler,true);
+    }
+    private void AppCard_Unloaded(object sender,RoutedEventArgs args) {
+        if(sender is not UIElement source)return;
+        foreach(var (routedEvent,handler) in CardPointerHandlers)source.RemoveHandler(routedEvent,handler);
+        if(dragGesture is { } gesture && ReferenceEquals(gesture.Source,source))
+            dragOwnership.Release(gesture.Ticket,()=>{dragGesture=null;source.ReleasePointerCaptures();});
+    }
 
     private void AppCard_PointerPressed(object sender,PointerRoutedEventArgs args) {
         if(closing || windowShutdown.HasStarted || sender is not FrameworkElement source || source.Tag is not AppCard || !args.GetCurrentPoint(source).Properties.IsLeftButtonPressed) return;
+        // Touch keeps the list's native scrolling gesture; shortcut dragging is a mouse action.
+        if(args.Pointer.PointerDeviceType==Microsoft.UI.Input.PointerDeviceType.Touch)return;
         for(var current=args.OriginalSource as DependencyObject;current!=null && !ReferenceEquals(current,sender);current=VisualTreeHelper.GetParent(current))
-            if(current is Button) return;
-        dragGesture=new(args.Pointer.PointerId,args.GetCurrentPoint(source).Position,dragOwnership.Begin());
-        source.CapturePointer(args.Pointer);
+            if(current is ButtonBase button && button.Tag is not AppCard) return;
+        dragGesture=new(source,args.Pointer.PointerId,args.GetCurrentPoint(source).Position,dragOwnership.Begin());
     }
     private void AppCard_PointerReleased(object sender,PointerRoutedEventArgs args) {
         if(dragGesture?.Pointer!=args.Pointer.PointerId) return;
         var gesture=dragGesture;
         if(gesture!=null) dragOwnership.Release(gesture.Ticket,()=>{dragGesture=null;(sender as UIElement)?.ReleasePointerCaptures();});
+    }
+    private void AppCard_PointerCaptureLost(object sender,PointerRoutedEventArgs args) {
+        // Taking capture from the opening button cancels its click, but the
+        // shortcut gesture remains owned until release/cancel or native drag.
+        if(dragGesture?.Preparing!=true)AppCard_PointerReleased(sender,args);
     }
     private async void AppCard_PointerMoved(object sender,PointerRoutedEventArgs args) {
         if(closing || windowShutdown.HasStarted)return;
@@ -39,6 +68,7 @@ public sealed partial class MainWindow {
         if(!point.Properties.IsLeftButtonPressed) {AppCard_PointerReleased(sender,args);return;}
         if(Math.Abs(point.Position.X-gesture.Origin.X)<8 && Math.Abs(point.Position.Y-gesture.Origin.Y)<8) return;
         gesture.Preparing=true;args.Handled=true;
+        source.CapturePointer(args.Pointer);
         try {
             var key=card.SourceSerial+"\n"+card.PackageName+"\n"+card.IconPath;
             if(dragFiles.TryGetValue(key,out var cached) && (cached.IsFaulted || cached.IsCanceled || cached.IsCompletedSuccessfully && !File.Exists(cached.Result.Path))) dragFiles.Remove(key);

@@ -1,198 +1,179 @@
-<Window
-    x:Class="VirCre.Desktop.MainWindow"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:presentation="using:VirCre.Presentation"
-    xmlns:launcher="using:VirCre.Launcher"
-    Title="virCre · 手机应用">
-    <Window.SystemBackdrop><MicaBackdrop /></Window.SystemBackdrop>
-    <Grid x:Name="Root" Language="zh-CN" Loaded="Root_Loaded">
-        <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-        <Grid x:Name="TitleBar" Margin="20,0,140,0" Background="Transparent">
-            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Image Width="24" Height="24" Source="ms-appx:///Assets/Brand/vircre-icon-256.png" AutomationProperties.Name="virCre" />
-                <TextBlock Text="virCre" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock Text="手机应用，桌面体验" FontSize="12" Margin="8,0,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-            </StackPanel>
-        </Grid>
-        <NavigationView x:Name="Navigation" Grid.Row="1" PaneDisplayMode="Left" OpenPaneLength="224"
-                        IsBackButtonVisible="Collapsed" IsPaneToggleButtonVisible="False" IsSettingsVisible="True"
-                        SelectionChanged="Navigation_SelectionChanged">
-            <NavigationView.PaneHeader>
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1" CornerRadius="10" Padding="14" Margin="14,12,14,22">
-                    <StackPanel Spacing="12">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE8EA;" FontSize="22" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <StackPanel Spacing="2">
-                                <TextBlock x:Name="DeviceName" Text="未选择设备" FontWeight="SemiBold" FontSize="13" MaxWidth="130" TextTrimming="CharacterEllipsis" />
-                                <TextBlock x:Name="DeviceHint" Text="刷新并选择手机" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </StackPanel>
-                        <ComboBox x:Name="DevicePicker" PlaceholderText="选择手机" HorizontalAlignment="Stretch" SelectionChanged="DevicePicker_SelectionChanged" AutomationProperties.Name="选择手机">
-                            <ComboBox.ItemTemplate><DataTemplate x:DataType="launcher:PhoneDevice">
-                                <StackPanel MaxWidth="300" Spacing="2" ToolTipService.ToolTip="{x:Bind Serial}">
-                                    <TextBlock Text="{x:Bind DisplayLabel}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind Serial}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </DataTemplate></ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <Button x:Name="RefreshDevices" Content="刷新设备与应用" HorizontalAlignment="Stretch" Click="RefreshDevices_Click" />
-                        <TextBlock Text="启动使用缓存，应用变化后手动刷新。" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
-                </Border>
-            </NavigationView.PaneHeader>
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="全部应用" Tag="apps"><NavigationViewItem.Icon><FontIcon Glyph="&#xE8A9;" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="收藏" Tag="favorites"><NavigationViewItem.Icon><FontIcon Glyph="&#xE734;" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="运行中" Tag="running"><NavigationViewItem.Icon><FontIcon Glyph="&#xE7F4;" /></NavigationViewItem.Icon></NavigationViewItem>
-            </NavigationView.MenuItems>
-            <NavigationView.PaneFooter>
-                <StackPanel Margin="22,12,16,18" Spacing="5">
-                    <TextBlock Text="WORKSPACE" FontSize="10" CharacterSpacing="120" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                    <TextBlock Text="你的手机应用工作台" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+<Window x:Class="VirCre.Desktop.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:presentation="using:VirCre.Presentation" xmlns:launcher="using:VirCre.Launcher" Title="virCre · 手机应用">
+    <Grid x:Name="Root" Language="zh-CN" Loaded="Root_Loaded" Background="{ThemeResource ShellSidebar}">
+        <Grid.RowDefinitions><RowDefinition Height="44" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1">
+            <Grid x:Name="TitleBar" Margin="16,0,140,0" Background="Transparent">
+                <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                    <Image Width="23" Height="23" Source="ms-appx:///Assets/Brand/vircre-icon-256.png" AutomationProperties.Name="virCre" />
+                    <TextBlock Text="virCre" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" VerticalAlignment="Center" />
                 </StackPanel>
-            </NavigationView.PaneFooter>
-            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="12,0,0,0"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,1,0,0" Margin="0,0,0,0">
-                <Grid Padding="28,24,28,16" RowSpacing="22">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                    <Grid ColumnSpacing="20">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <StackPanel Spacing="6">
-                            <TextBlock x:Name="PageTitle" Text="全部应用" FontSize="28" FontWeight="SemiBold" />
-                            <TextBlock x:Name="PageDescription" Style="{StaticResource SectionHint}" Text="手机上的应用，在桌面从容使用。" />
+            </Grid>
+        </Border>
+        <NavigationView x:Name="Navigation" Grid.Row="1" PaneDisplayMode="Left" OpenPaneLength="180" IsPaneOpen="True" IsBackButtonVisible="Collapsed" IsPaneToggleButtonVisible="False" IsSettingsVisible="True" IsTitleBarAutoPaddingEnabled="False" SelectionChanged="Navigation_SelectionChanged">
+            <NavigationView.Resources>
+                <Thickness x:Key="NavigationViewContentMargin">0</Thickness>
+                <Thickness x:Key="NavigationViewContentGridBorderThickness">1,0,0,0</Thickness>
+                <CornerRadius x:Key="NavigationViewContentGridCornerRadius">0</CornerRadius>
+            </NavigationView.Resources>
+            <NavigationView.MenuItems>
+                <NavigationViewItem Tag="apps" AutomationProperties.Name="全部应用" Margin="0,8,0,0">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE80A;" FontSize="16" /></NavigationViewItem.Icon>
+                    <Grid Width="104"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="全部应用" FontSize="13" /><TextBlock x:Name="AllNavCount" Grid.Column="1" Text="0" FontSize="11" Foreground="{ThemeResource ShellMuted}" VerticalAlignment="Center" /></Grid>
+                </NavigationViewItem>
+                <NavigationViewItem Tag="favorites" AutomationProperties.Name="收藏">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE734;" FontSize="16" /></NavigationViewItem.Icon>
+                    <Grid Width="104"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="收藏" FontSize="13" /><TextBlock x:Name="FavoriteNavCount" Grid.Column="1" Text="0" FontSize="11" Foreground="{ThemeResource ShellMuted}" VerticalAlignment="Center" /></Grid>
+                </NavigationViewItem>
+                <NavigationViewItem Tag="running" AutomationProperties.Name="运行中">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE7F4;" FontSize="16" /></NavigationViewItem.Icon>
+                    <Grid Width="104"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="运行中" FontSize="13" /><TextBlock x:Name="RunningNavCount" Grid.Column="1" Text="0" FontSize="11" Foreground="{ThemeResource ShellMuted}" VerticalAlignment="Center" /></Grid>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <Grid Background="{ThemeResource ShellPaper}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" MinHeight="75">
+                    <Grid Padding="28,12" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Border Width="32" Height="37" Background="{ThemeResource ShellSoft}" CornerRadius="8" VerticalAlignment="Center"><FontIcon Glyph="&#xE8EA;" FontSize="18" Foreground="{ThemeResource ShellMuted}" /></Border>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                            <ComboBox x:Name="DevicePicker" PlaceholderText="选择手机" MinWidth="0" MaxWidth="240" HorizontalAlignment="Left" Background="Transparent" BorderThickness="0" Padding="0,2,22,2" MinHeight="26" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource ShellInk}" SelectionChanged="DevicePicker_SelectionChanged" AutomationProperties.Name="选择手机">
+                                <ComboBox.ItemTemplate><DataTemplate x:DataType="launcher:PhoneDevice"><TextBlock Text="{x:Bind Model}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Serial}" /></DataTemplate></ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock x:Name="DeviceHint" Text="连接后选择设备" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1" CornerRadius="14" Padding="10,5" VerticalAlignment="Top" Margin="0,7,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Ellipse Width="6" Height="6" Fill="#7C9B94" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ConnectionStatus" Text="未连接" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </Border>
+                        <StackPanel x:Name="ConnectionIndicator" Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0"><Ellipse x:Name="ConnectionDot" Width="6" Height="6" Fill="{ThemeResource ShellMuted}" VerticalAlignment="Center" /><TextBlock x:Name="ConnectionStatus" Text="未连接" FontSize="11" Foreground="{ThemeResource ShellMuted}" /></StackPanel>
+                        <Button x:Name="RefreshDevices" Grid.Column="3" Style="{StaticResource ShellQuietButton}" Click="RefreshDevices_Click" VerticalAlignment="Center" AutomationProperties.Name="刷新设备与应用" ToolTipService.ToolTip="重新读取设备与应用；平时启动使用缓存"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72C;" FontSize="15" /><TextBlock x:Name="RefreshLabel" Text="刷新设备与应用" FontSize="12" /></StackPanel></Button>
                     </Grid>
-                    <Grid x:Name="SearchRow" Grid.Row="1" ColumnSpacing="12">
+                </Border>
+                <Grid x:Name="ContentArea" Grid.Row="1" Padding="28,24,28,0" Background="{ThemeResource ShellField}" SizeChanged="ContentArea_SizeChanged">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <TextBlock x:Name="PageTitle" Text="全部应用" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" Visibility="Collapsed" AutomationProperties.HeadingLevel="Level1" Margin="0,0,0,16" />
+                    <Grid x:Name="SearchRow" Grid.Row="1" ColumnSpacing="12" Margin="0,0,0,16">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索应用名称或包名" QueryIcon="Find" TextChanged="Search_TextChanged"
-                                        AutomationProperties.Name="搜索应用" HorizontalAlignment="Stretch" MaxWidth="380" />
-                        <ProgressRing x:Name="LoadingRing" Grid.Column="1" Width="20" Height="20" IsActive="False" />
-                        <TextBlock x:Name="AppCount" Grid.Column="2" Text="0 个应用" Style="{StaticResource SectionHint}" VerticalAlignment="Center" />
+                        <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索应用名称或包名" QueryIcon="Find" TextChanged="Search_TextChanged" Background="{ThemeResource ShellPaper}" CornerRadius="7" FontSize="12" MinHeight="36" AutomationProperties.Name="搜索应用名称或包名" HorizontalAlignment="Left" MaxWidth="345" Width="345" BorderThickness="1" BorderBrush="{ThemeResource ShellLine}">
+                            <AutoSuggestBox.Resources>
+                                <ResourceDictionary>
+                                    <ResourceDictionary.ThemeDictionaries>
+                                        <ResourceDictionary x:Key="Light">
+                                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#E5EAF2" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#E5EAF2" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#2765E8" />
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="Default">
+                                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#2D384C" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#2D384C" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#91B5FF" />
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="HighContrast">
+                                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="{ThemeResource SystemColorWindowTextColor}" />
+                                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{ThemeResource SystemColorHotlightColor}" />
+                                        </ResourceDictionary>
+                                    </ResourceDictionary.ThemeDictionaries>
+                                    <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
+                                </ResourceDictionary>
+                            </AutoSuggestBox.Resources>
+                        </AutoSuggestBox>
+                        <ProgressRing x:Name="LoadingRing" Grid.Column="1" Width="18" Height="18" IsActive="False" AutomationProperties.Name="正在读取" />
+                        <TextBlock x:Name="AppCount" Grid.Column="2" Text="0 个应用" FontSize="11" Foreground="{ThemeResource ShellMuted}" VerticalAlignment="Center" />
                     </Grid>
                     <Grid Grid.Row="2">
-                        <GridView x:Name="AppGrid" SelectionMode="None" IsItemClickEnabled="False" Padding="0,0,0,8" Margin="-6,0,-6,0" SizeChanged="AppGrid_SizeChanged"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <GridView.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="230" /></ItemsPanelTemplate></GridView.ItemsPanel>
-                            <GridView.ItemContainerStyle>
-                                <Style TargetType="GridViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="VerticalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="6,0,6,12" /></Style>
-                            </GridView.ItemContainerStyle>
-                            <GridView.ItemTemplate>
-                                <DataTemplate x:DataType="presentation:AppCard">
-                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            BorderThickness="1" CornerRadius="10" Padding="16" Tag="{Binding}" DoubleTapped="AppCard_DoubleTapped"
-                                            PointerPressed="AppCard_PointerPressed" PointerMoved="AppCard_PointerMoved" PointerReleased="AppCard_PointerReleased" PointerCanceled="AppCard_PointerReleased" PointerCaptureLost="AppCard_PointerReleased">
-                                        <Border.ContextFlyout><MenuFlyout>
-                                            <MenuFlyoutItem Text="创建桌面快捷方式" Tag="{Binding}" Click="CreateShortcut_Click" />
-                                        </MenuFlyout></Border.ContextFlyout>
-                                        <Grid RowSpacing="11">
-                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                            <Grid>
-                                                <Border Background="{Binding Color, Converter={StaticResource ColorBrush}}" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left">
-                                                    <Grid>
-                                                        <FontIcon Glyph="{x:Bind Glyph}" FontSize="22" Foreground="White" Visibility="{Binding IconPath, Converter={StaticResource AppIcon}, ConverterParameter=fallback}" />
-                                                        <Image Source="{Binding IconPath, Converter={StaticResource AppIcon}}" Stretch="Uniform" />
-                                                    </Grid>
-                                                </Border>
-                                                <Button Background="Transparent" BorderThickness="0" Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                        Click="Favorite_Click" Tag="{x:Bind PackageName}" AutomationProperties.Name="{x:Bind FavoriteLabel}"
-                                                        ToolTipService.ToolTip="{x:Bind FavoriteLabel}">
-                                                    <FontIcon Glyph="{x:Bind FavoriteGlyph}" FontSize="15" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                </Button>
+                        <GridView x:Name="AppGrid" SelectionMode="None" IsItemClickEnabled="False" Padding="0,0,0,20" Margin="-5,0,-5,0" SizeChanged="AppGrid_SizeChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="应用列表">
+                            <GridView.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="230" ItemHeight="82" /></ItemsPanelTemplate></GridView.ItemsPanel>
+                            <GridView.ItemContainerStyle><StaticResource ResourceKey="AppCardContainer" /></GridView.ItemContainerStyle>
+                            <GridView.ItemContainerTransitions><TransitionCollection /></GridView.ItemContainerTransitions>
+                            <GridView.ItemTemplate><DataTemplate x:DataType="presentation:AppCard">
+                                <Border Background="{ThemeResource ShellPaper}" BorderBrush="{ThemeResource ShellLine}" BorderThickness="0.5" CornerRadius="13" Padding="0" Tag="{Binding}" Loaded="AppCard_Loaded" Unloaded="AppCard_Unloaded">
+                                    <Border.ContextFlyout><MenuFlyout><MenuFlyoutItem Text="创建桌面快捷方式" Tag="{Binding}" Click="CreateShortcut_Click" /></MenuFlyout></Border.ContextFlyout>
+                                    <Grid>
+                                        <Button Style="{StaticResource CardOpenButton}" Click="OpenApp_Click" Tag="{Binding}" ToolTipService.ToolTip="{x:Bind PackageName}" AutomationProperties.Name="{x:Bind OpenLabel}">
+                                            <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="46" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <Border Background="{Binding Color, Converter={StaticResource ColorBrush}}" CornerRadius="12" Width="46" Height="46"><Grid><FontIcon Glyph="{x:Bind Glyph}" FontSize="22" Foreground="White" Visibility="{Binding IconPath, Converter={StaticResource AppIcon}, ConverterParameter=fallback}" /><Image Source="{Binding IconPath, Converter={StaticResource AppIcon}}" Stretch="Uniform" /></Grid></Border>
+                                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                                                    <Grid><TextBlock Text="{x:Bind InactiveHint}" FontSize="12" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis" /><StackPanel Orientation="Horizontal" Spacing="5" Visibility="{Binding IsRunning, Converter={StaticResource BoolVisibility}}"><Ellipse Width="5" Height="5" Fill="{ThemeResource ShellGreen}" VerticalAlignment="Center" /><TextBlock Text="运行中 · 切回" FontSize="12" Foreground="{ThemeResource ShellGreen}" /></StackPanel></Grid>
+                                                </StackPanel>
                                             </Grid>
-                                            <StackPanel Grid.Row="1" Spacing="3">
-                                                <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
-                                                <TextBlock Text="{x:Bind PackageName}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{x:Bind KindLabel}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
-                                            <Button Grid.Row="2" Content="打开应用" HorizontalAlignment="Stretch" FontSize="12" MinHeight="28" Padding="10,3"
-                                                    Click="OpenApp_Click" Tag="{Binding}" ToolTipService.ToolTip="在独立窗口中打开此应用" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </GridView.ItemTemplate>
+                                        </Button>
+                                        <ToggleButton HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{x:Bind IsFavorite}" Background="Transparent" BorderThickness="0" CornerRadius="11" Foreground="{ThemeResource ShellMuted}" Padding="0" Width="44" Height="44" MinWidth="44" MinHeight="44" VerticalAlignment="Center" Click="Favorite_Click" Tag="{x:Bind PackageName}" AutomationProperties.Name="{x:Bind FavoriteLabel}" ToolTipService.ToolTip="{x:Bind FavoriteLabel}">
+<FontIcon Glyph="{x:Bind FavoriteGlyph}" FontSize="18" />
+                                        </ToggleButton>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate></GridView.ItemTemplate>
                         </GridView>
-                        <ListView x:Name="RunningList" Visibility="Collapsed" SelectionMode="None" Padding="0,0,0,12">
-                            <ListView.ItemContainerStyle><Style TargetType="ListViewItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,12" />
-                            </Style></ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate><DataTemplate x:DataType="launcher:AppWindowInfo">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
-                                    <Grid ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="5" ToolTipService.ToolTip="{Binding Request.Serial}">
-                                            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <StackPanel Orientation="Horizontal" Spacing="10"><TextBlock Text="{Binding DeviceName}" Style="{StaticResource SectionHint}" /><TextBlock Text="{Binding StateLabel}" Style="{StaticResource SectionHint}" /></StackPanel>
-                                            <TextBlock Text="{Binding ModeLabel}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock Text="{Binding PackageName}" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Content="相机画面" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Visibility="{Binding IsVirtualCamera, Converter={StaticResource BoolVisibility}}" Click="CameraControl_Click" VerticalAlignment="Center" />
-                                        <Button Grid.Column="2" Content="切回窗口" Tag="{Binding Id}" IsEnabled="{Binding CanFocus}" Click="FocusWindow_Click" VerticalAlignment="Center" />
-                                        <Button Grid.Column="3" Content="关闭" Tag="{Binding Id}" IsEnabled="{Binding CanClose}" Click="CloseWindow_Click" VerticalAlignment="Center" />
+                        <ListView x:Name="RunningList" Visibility="Collapsed" SelectionMode="None" Padding="0,0,0,20" AutomationProperties.Name="运行中的窗口">
+                            <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,10" /></Style></ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate><DataTemplate x:DataType="presentation:RunningWindowCard">
+                                <Border Background="{ThemeResource ShellPaper}" BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" CornerRadius="8" Padding="14,16">
+                                    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="46" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <Border Background="{Binding Color, Converter={StaticResource ColorBrush}}" Width="46" Height="46" CornerRadius="12" VerticalAlignment="Center">
+                                            <Grid><FontIcon Glyph="{x:Bind Glyph}" FontSize="22" Foreground="White" Visibility="{Binding IconPath, Converter={StaticResource AppIcon}, ConverterParameter=fallback}" /><Image Source="{Binding IconPath, Converter={StaticResource AppIcon}}" Stretch="Uniform" /></Grid>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="5" ToolTipService.ToolTip="{Binding Window.PackageName}"><TextBlock Text="{Binding Window.Name}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" TextTrimming="CharacterEllipsis" /><TextBlock FontSize="11" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding Window.DeviceName}" /><Run Text=" · " /><Run Text="{Binding Window.ModeLabel}" /><Run Text=" · " /><Run Text="{Binding Window.StateLabel}" /></TextBlock></StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource ShellQuietButton}" Content="相机画面" Tag="{Binding Window.Id}" IsEnabled="{Binding Window.CanFocus}" Visibility="{Binding Window.IsVirtualCamera, Converter={StaticResource BoolVisibility}}" Click="CameraControl_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="3" Style="{StaticResource ShellQuietButton}" Content="切回窗口" Tag="{Binding Window.Id}" IsEnabled="{Binding Window.CanFocus}" Click="FocusWindow_Click" VerticalAlignment="Center" />
+                                        <Button Grid.Column="4" Style="{StaticResource ShellQuietButton}" Content="关闭" Tag="{Binding Window.Id}" IsEnabled="{Binding Window.CanClose}" Click="CloseWindow_Click" VerticalAlignment="Center" />
                                     </Grid>
                                 </Border>
                             </DataTemplate></ListView.ItemTemplate>
                         </ListView>
-                        <StackPanel x:Name="EmptyState" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="390" Margin="20">
-                            <Border Width="72" Height="72" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="20" HorizontalAlignment="Center">
-                                <FontIcon x:Name="EmptyIcon" Glyph="&#xE8A9;" FontSize="30" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </Border>
-                            <TextBlock x:Name="EmptyTitle" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                            <TextBlock x:Name="EmptyDescription" Style="{StaticResource SectionHint}" TextAlignment="Center" HorizontalAlignment="Center" />
-                        </StackPanel>
-                        <ScrollViewer x:Name="SettingsContent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                            <StackPanel Spacing="16">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE790;" FontSize="18" /><TextBlock Text="外观" FontSize="16" FontWeight="SemiBold" /></StackPanel>
-                                        <TextBlock Text="选择适合你的界面主题。" Style="{StaticResource SectionHint}" />
-                                        <RadioButtons x:Name="ThemeChoice" SelectedIndex="0" MaxColumns="3" SelectionChanged="Theme_SelectionChanged">
-                                            <x:String>跟随系统</x:String><x:String>浅色</x:String><x:String>深色</x:String>
-                                        </RadioButtons>
-                                    </StackPanel>
-                                </Border>
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE722;" FontSize="18" /><TextBlock Text="虚拟摄像头" FontSize="16" FontWeight="SemiBold" /></StackPanel>
-                                        <ToggleSwitch x:Name="VirtualCameraToggle" Header="打开应用时启用虚拟摄像头" IsOn="True" OnContent="已开启" OffContent="已关闭" Toggled="VirtualCamera_Toggled" />
-                                        <TextBlock x:Name="VirtualCameraCompatibility" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="将投屏窗口下方的桌面作为手机应用的相机画面，随窗口移动更新。开关对新打开的应用和桌面快捷方式生效，已有窗口保持当前模式。" Style="{StaticResource SectionHint}" />
-                                        <NumberBox x:Name="CameraFrameRateBox" Header="桌面相机目标帧率（fps）" Minimum="1" Maximum="30" Value="15" SmallChange="1" LargeChange="5"
-                                                   SpinButtonPlacementMode="Inline" Width="220" HorizontalAlignment="Left" ValueChanged="CameraFrameRate_ValueChanged" LostFocus="CameraFrameRate_LostFocus" />
-                                        <TextBlock Text="1–30fps，默认15fps。帧率修改会应用到正在运行的相机会话；实际帧率取决于电脑、手机与连接性能。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="实验版同时仅支持一个相机窗口，正常运行没有时长上限。需要同时打开其他普通窗口时，可先关闭此开关。" Style="{StaticResource SectionHint}" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10" Padding="22">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="关于这个版本" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock x:Name="AboutVersion" Text="virCre" FontWeight="SemiBold" />
-                                        <TextBlock Text="应用名称和包名实时从所选手机读取。双击应用卡片可打开独立窗口；在运行中页面切回或关闭。窗口不转发声音。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="图标从手机应用资源读取；个别读取失败时显示占位图。拖出应用卡片，或右键创建桌面快捷方式。" Style="{StaticResource SectionHint}" />
-                                        <TextBlock Text="主题、收藏与虚拟摄像头设置保存在当前 Windows 用户的本地设置中。快捷方式需要对应手机在线并已授权 ADB；移动程序目录后需重新创建。" Style="{StaticResource SectionHint}" />
-                                    </StackPanel>
-                                </Border>
+                        <ScrollViewer x:Name="EmptyState" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="390" Margin="12,40">
+                                <Border Width="68" Height="68" Background="{ThemeResource ShellSoft}" CornerRadius="18" HorizontalAlignment="Center"><FontIcon x:Name="EmptyIcon" Glyph="&#xE8EA;" FontSize="29" Foreground="{ThemeResource ShellAccent}" /></Border>
+                                <TextBlock x:Name="EmptyTitle" FontSize="21" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock x:Name="EmptyDescription" Style="{StaticResource ShellHint}" TextAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="EmptySteps" Text="1  连接手机    2  开启调试并授权    3  刷新设备" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed" />
+                                <Button x:Name="EmptyAction" Content="刷新设备" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Center" Click="EmptyAction_Click" />
                             </StackPanel>
                         </ScrollViewer>
+                        <ScrollViewer x:Name="SettingsContent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Padding="0,0,0,20">
+                                <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" Padding="0,8,0,22">
+                                    <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="5"><TextBlock Text="外观" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" /><TextBlock Text="选择适合你的界面主题。" Style="{StaticResource ShellHint}" /></StackPanel>
+                                        <ComboBox x:Name="ThemeChoice" Grid.Column="1" SelectedIndex="0" SelectionChanged="Theme_SelectionChanged" VerticalAlignment="Center" AutomationProperties.Name="界面主题"><x:String>跟随系统</x:String><x:String>浅色</x:String><x:String>深色</x:String></ComboBox>
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" Padding="0,22">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="5"><TextBlock Text="虚拟摄像头" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" /><TextBlock Text="将应用窗口下方的桌面作为相机画面。开关对新打开的应用和快捷方式生效。" Style="{StaticResource ShellHint}" /></StackPanel>
+                                            <ToggleSwitch x:Name="VirtualCameraToggle" Grid.Column="1" IsOn="True" OnContent="" OffContent="" Toggled="VirtualCamera_Toggled" VerticalAlignment="Center" AutomationProperties.Name="打开应用时启用虚拟摄像头" />
+                                        </Grid>
+                                        <TextBlock x:Name="VirtualCameraCompatibility" Style="{StaticResource ShellHint}" />
+                                        <TextBlock Text="实验版同时支持一个相机窗口，正常运行没有时长上限。已有窗口保持当前模式。" Style="{StaticResource ShellHint}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" Padding="0,22">
+                                    <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="5"><TextBlock Text="桌面相机目标帧率" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" /><TextBlock Text="1–30 fps，默认 15 fps。修改立即生效，实际帧率取决于设备与连接性能。" Style="{StaticResource ShellHint}" /></StackPanel>
+                                        <NumberBox x:Name="CameraFrameRateBox" Grid.Column="1" Minimum="1" Maximum="30" Value="15" SmallChange="1" LargeChange="5" SpinButtonPlacementMode="Inline" Width="130" VerticalAlignment="Center" ValueChanged="CameraFrameRate_ValueChanged" LostFocus="CameraFrameRate_LostFocus" AutomationProperties.Name="桌面相机目标帧率，fps" />
+                                    </Grid>
+                                </Border>
+                                <StackPanel Spacing="8" Padding="0,22,0,8">
+                                    <TextBlock x:Name="AboutVersion" Text="virCre" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" />
+                                    <TextBlock Text="单击应用卡片打开或切回独立窗口；右侧星标收藏。拖出卡片或右键创建桌面快捷方式。窗口不转发声音。" Style="{StaticResource ShellHint}" />
+                                    <TextBlock Text="应用名称、包名与图标从手机读取并缓存。安装、卸载或更新应用后，请点击“刷新设备与应用”。" Style="{StaticResource ShellHint}" />
+                                    <TextBlock Text="设置保存在当前 Windows 用户下。快捷方式需要手机在线并已授权 ADB；移动程序目录后需重新创建。" Style="{StaticResource ShellHint}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+
                     </Grid>
-                    <Border Grid.Row="3" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
-                        <StackPanel Spacing="8">
-                        <InfoBar x:Name="ActionNotice" IsOpen="False" IsClosable="True" />
-                        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
-                            <TextBlock x:Name="FooterStatus" Grid.Column="1" Text="连接手机后读取应用。" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </Grid>
-                        </StackPanel>
-                    </Border>
+
                 </Grid>
-            </Border>
+                <Border Grid.Row="2" Background="{ThemeResource ShellField}" BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,1,0,0" Padding="28,6" Height="38">
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Ellipse x:Name="FooterDot" Width="6" Height="6" Fill="{ThemeResource ShellMuted}" VerticalAlignment="Center" />
+                        <FontIcon x:Name="NoticeIcon" Glyph="&#xE946;" FontSize="12" Foreground="{ThemeResource ShellAccent}" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <TextBlock x:Name="FooterStatus" Grid.Column="1" Text="等待连接 · 请在手机上允许调试授权" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+                        <ContentPresenter x:Name="FooterAction" Grid.Column="2" Visibility="Collapsed" VerticalAlignment="Center" />
+                        <Button x:Name="DismissStatusMessage" Grid.Column="3" Style="{StaticResource ShellQuietButton}" Padding="4" Width="24" Height="24" MinWidth="24" MinHeight="24" Visibility="Collapsed" Click="DismissStatusMessage_Click" AutomationProperties.Name="关闭消息，恢复设备状态" ToolTipService.ToolTip="关闭消息，恢复设备状态"><FontIcon Glyph="&#xE711;" FontSize="10" /></Button>
+                    </Grid>
+                </Border>
+            </Grid>
         </NavigationView>
     </Grid>
 </Window>

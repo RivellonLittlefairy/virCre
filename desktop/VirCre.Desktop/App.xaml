@@ -5,7 +5,10 @@
     xmlns:local="using:VirCre.Desktop">
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries><XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" /></ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="ShellStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
             <FontFamily x:Key="ContentControlThemeFontFamily">Microsoft YaHei UI</FontFamily>
             <FontFamily x:Key="XamlAutoFontFamily">Microsoft YaHei UI</FontFamily>
             <local:ColorBrushConverter x:Key="ColorBrush" />
