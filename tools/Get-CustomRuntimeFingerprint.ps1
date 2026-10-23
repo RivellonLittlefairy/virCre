@@ -4,7 +4,7 @@ $repoDirectory=Split-Path $PSScriptRoot -Parent
 $sourceDirectory=Join-Path $repoDirectory 'third_party/scrcpy'
 $cameraDirectory=Join-Path $repoDirectory 'camera-agent/src/main/java/com/example/vircam'
 $cameraFiles=@(Get-ChildItem -LiteralPath (Join-Path $cameraDirectory 'shell') -File -Filter '*.java')
-foreach($name in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java')) {
+foreach($name in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java','TextureRevision.java','DesktopFrameRenderer.java')) {
     $cameraFiles+=Get-Item -LiteralPath (Join-Path $cameraDirectory "core/$name")
 }
 # Match the original build fingerprint so existing verified caches remain reusable.

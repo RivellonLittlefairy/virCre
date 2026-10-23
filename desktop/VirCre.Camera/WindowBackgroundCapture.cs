@@ -13,6 +13,7 @@ internal sealed class WindowBackgroundCapture : IDisposable {
     private readonly Dictionary<IntPtr,MonitorCapture> monitors=[];
     private readonly int outputWidth,outputHeight;
     private byte[]? cropped;
+    private readonly FrameEncodingCache encoded=new();
 
     internal WindowBackgroundCapture(int width,int height) {
         if(!FrameProtocol.IsSupportedImage(width,height,FrameProtocol.FormatJpeg))throw new IOException("投屏相机尺寸超出支持范围。");
@@ -62,16 +63,24 @@ internal sealed class WindowBackgroundCapture : IDisposable {
                     cropped,checked(((targetY+y)*client.Width+targetX)*4),rowBytes);
             }
         }
+        // Include the full window rectangle, viewport and intersecting monitor topology.
+        // Equal pixels at a new window position still invalidate the cached region.
+        var geometry=$"{window}:{region.ClientBounds.Left},{region.ClientBounds.Top},{region.ClientBounds.Width},{region.ClientBounds.Height}:{client.Left},{client.Top},{client.Width},{client.Height}:"+
+            string.Join(";",region.Monitors.OrderBy(value=>value.Handle.ToInt64()).Select(value=>$"{value.Handle}:{value.Bounds.Left},{value.Bounds.Top},{value.Bounds.Width},{value.Bounds.Height}"));
+        return await encoded.GetAsync(cropped,geometry,(quality,cancel)=>EncodeJpegAsync(cropped,client,quality,cancel),token).ConfigureAwait(false);
+    }
+
+    private async Task<byte[]> EncodeJpegAsync(byte[] pixels,CaptureNative.Rect client,float quality,CancellationToken token) {
         using var stream=new InMemoryRandomAccessStream();
-        var properties=new BitmapPropertySet { ["ImageQuality"]=new BitmapTypedValue(0.88f,Windows.Foundation.PropertyType.Single) };
+        var properties=new BitmapPropertySet { ["ImageQuality"]=new BitmapTypedValue(quality,Windows.Foundation.PropertyType.Single) };
         var encoder=await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId,stream,properties).AsTask(token).ConfigureAwait(false);
-        encoder.SetPixelData(BitmapPixelFormat.Bgra8,BitmapAlphaMode.Ignore,(uint)client.Width,(uint)client.Height,96,96,cropped);
+        encoder.SetPixelData(BitmapPixelFormat.Bgra8,BitmapAlphaMode.Ignore,(uint)client.Width,(uint)client.Height,96,96,pixels);
         // Native image scaling avoids a managed per-pixel loop over a full-resolution camera frame.
         encoder.BitmapTransform.ScaledWidth=(uint)outputWidth;
         encoder.BitmapTransform.ScaledHeight=(uint)outputHeight;
         encoder.BitmapTransform.InterpolationMode=BitmapInterpolationMode.Linear;
         await encoder.FlushAsync().AsTask(token).ConfigureAwait(false);
-        if(stream.Size>FrameProtocol.MaxPayload)throw new IOException("桌面帧超过传输上限。");
+        if(stream.Size>FrameProtocol.MaxPayload)throw new JpegPayloadTooLargeException();
         stream.Seek(0);
         var image=new byte[(int)stream.Size];
         using var data=new DataReader(stream.GetInputStreamAt(0));
@@ -101,17 +110,21 @@ internal sealed class WindowBackgroundCapture : IDisposable {
     }
 
     private sealed class MonitorCapture : IDisposable {
-        private readonly GraphicsCaptureItem item;
-        private readonly Direct3D11CaptureFramePool pool;
-        private readonly GraphicsCaptureSession session;
+        private GraphicsCaptureItem item=null!;
+        private Direct3D11CaptureFramePool pool=null!;
+        private GraphicsCaptureSession session=null!;
+        private readonly IDirect3DDevice device;
         private readonly CaptureNative.MonitorRegion monitor;
-        private readonly long started=System.Diagnostics.Stopwatch.GetTimestamp();
+        private readonly CaptureHealth health=new(Environment.TickCount64);
         private Windows.Storage.Streams.Buffer? staging;
         private volatile bool closed;
         internal byte[]? Pixels {get;private set;}
 
         internal MonitorCapture(IDirect3DDevice device,CaptureNative.MonitorRegion monitor) {
-            this.monitor=monitor;
+            this.device=device;this.monitor=monitor;
+            Start();
+        }
+        private void Start() {
             item=CaptureNative.CreateMonitorItem(monitor.Handle);
             item.Closed+=ItemClosed;
             try {
@@ -123,10 +136,11 @@ internal sealed class WindowBackgroundCapture : IDisposable {
                 } catch {pool.Dispose();throw;}
             } catch {item.Closed-=ItemClosed;throw;}
         }
-        private void ItemClosed(GraphicsCaptureItem sender,object args)=>closed=true;
+        private void ItemClosed(GraphicsCaptureItem sender,object args) {if(ReferenceEquals(sender,item))closed=true;}
         internal bool Matches(CaptureNative.MonitorRegion other)=>!closed && monitor.Equals(other);
         internal async Task UpdateAsync(CancellationToken token) {
             Direct3D11CaptureFrame? frame=null;
+            bool received=false;
             try {
                 while(pool.TryGetNextFrame() is { } next) {frame?.Dispose();frame=next;}
                 if(frame!=null) {
@@ -141,10 +155,15 @@ internal sealed class WindowBackgroundCapture : IDisposable {
                     Pixels??=new byte[length];
                     using var reader=DataReader.FromBuffer(staging);
                     reader.ReadBytes(Pixels);
+                    received=true;
                 }
             } finally {frame?.Dispose();}
-            if(Pixels==null && System.Diagnostics.Stopwatch.GetElapsedTime(started)>TimeSpan.FromSeconds(5))
-                throw new IOException("暂未收到显示器画面，正在重试。");
+            if(health.Observe(Environment.TickCount64,received)) {
+                // A static desktop may legitimately stop producing frames. Probe at most
+                // once per ten silent seconds; preserve pixels during the bounded first-frame wait.
+                item.Closed-=ItemClosed;Release(session);Release(pool);
+                Start();
+            }
         }
         public void Dispose() {
             closed=true;Pixels=null;staging=null;

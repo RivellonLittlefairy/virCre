@@ -6,7 +6,8 @@ import java.security.MessageDigest;
 
 /** Version 1: 64-byte big-endian header. Image pixels never enter diagnostic logs. */
 public final class FrameProtocol {
-    public static final int HELLO=1, FRAME=2, PAUSE=3, STOP=4, ACK=5;
+    // Repeat is an additive v1 extension, sent only after inputRepeat capability advertisement.
+    public static final int HELLO=1, FRAME=2, PAUSE=3, STOP=4, ACK=5, REPEAT=6, HOLD=7;
     public static final int MAX_PAYLOAD=4*1024*1024, HEADER_SIZE=64;
     public static final int MAX_IMAGE_DIMENSION=4096, MAX_IMAGE_PIXELS=4096*2160, FORMAT_PNG=1, FORMAT_JPEG=2;
     public static boolean isSupportedImage(int width,int height,int format) {
@@ -62,12 +63,12 @@ public final class FrameProtocol {
     }
 
     private static void validate(int type,int length,int device,long seq,long captured,int w,int h,int rotation,int format) throws IOException {
-        if(type<HELLO || type>ACK || device<=0 || seq<0 || captured<0 || length<0 || length>MAX_PAYLOAD)
+        if(type<HELLO || type>HOLD || device<=0 || seq<0 || captured<0 || length<0 || length>MAX_PAYLOAD || ((type==REPEAT || type==HOLD) && seq==0))
             throw new IOException("Invalid frame fields");
         if(type==FRAME) {
             if(length==0 || seq==0 || !isSupportedImage(w,h,format) || rotation!=0)
                 throw new IOException("Expected supported PNG/JPEG image dimensions, rotation 0");
-        } else if(length!=0 || w!=0 || h!=0 || rotation!=0 || format!=0 || (type==HELLO && seq!=0)) {
+        } else if((type==HOLD && captured!=0) || length!=0 || w!=0 || h!=0 || rotation!=0 || format!=0 || (type==HELLO && seq!=0)) {
             throw new IOException("Invalid control packet");
         }
     }

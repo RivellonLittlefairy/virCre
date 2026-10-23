@@ -74,6 +74,7 @@ if((args.Length==2 || args.Length==4 && args[2]=="--runtime-root") && args[0] ==
     Check(liveApps.Any(a => a.PackageName == "com.android.settings"), "integration includes exact Settings package");
     Console.WriteLine($"LIVE: total={liveApps.Count}; system={liveApps.Count(a=>a.IsSystem)}; user={liveApps.Count(a=>!a.IsSystem)}");
 }
+await AgentCatalogChecks.RunAsync();
 Console.WriteLine("PASS: launcher catalog checks");
 static void Check(bool value,string name) {if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
 static void Reject(Action action,string name) {try{action();}catch(InvalidDataException){Console.WriteLine("PASS: "+name);return;}throw new Exception(name);}

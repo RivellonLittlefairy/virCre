@@ -28,7 +28,9 @@ virCre-data/
 *.bak
 *.log
 
-# Local review notes; maintained project documentation is HTML
+# Local reviews, design drafts, team records and internal notes
+/.local/
+# Legacy review location; other agents may still write review notes here
 /docs/code-review-*.md
 
 # Private code-signing material

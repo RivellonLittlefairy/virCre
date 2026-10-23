@@ -87,7 +87,7 @@ public sealed partial class MainWindow : Window {
             foreach(var failure in result.Failures)RuntimeDiagnostics.Write(failure.Error is TimeoutException?"shutdown-timeout":"shutdown-work-failed",failure.Error,failure.Name);
             if(!result.CanClose) {
                 RestoreCleanupControls(result.Failures.Any(failure=>failure.Error is TimeoutException)
-                    ?"收尾等待超过15秒，界面已恢复；后台任务仍在结束，请稍后重试关闭。剩余应用窗口可在运行中页面关闭。"
+                    ?$"收尾等待超过{windowShutdown.WaitLimit.TotalSeconds:0.###}秒，界面已恢复；后台任务仍在结束，请稍后重试关闭。剩余应用窗口可在运行中页面关闭。"
                     :"仍有应用窗口未关闭，请在运行中页面重试关闭窗口，再关闭主界面。");
                 return;
             }

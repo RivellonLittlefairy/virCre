@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace VirCam.Core;
 
-public enum MessageType : ushort { Hello=1, Frame=2, Pause=3, Stop=4, Ack=5 }
+public enum MessageType : ushort { Hello=1, Frame=2, Pause=3, Stop=4, Ack=5, Repeat=6, Hold=7 }
 public sealed record Packet(MessageType Type,string Session,int DeviceId,long Sequence,long CapturedUtcMs,
     int Width,int Height,int Rotation,int Format,byte[] Payload);
 
@@ -52,12 +52,12 @@ public static class FrameProtocol {
         return Convert.FromHexString(session);
     }
     private static void Validate(MessageType type,int length,int device,long sequence,long captured,int w,int h,int rotation,int format) {
-        if(type<MessageType.Hello || type>MessageType.Ack || length<0 || length>MaxPayload || device<=0 || sequence<0 || captured<0)
+        if(type<MessageType.Hello || type>MessageType.Hold || length<0 || length>MaxPayload || device<=0 || sequence<0 || captured<0 || ((type==MessageType.Repeat || type==MessageType.Hold) && sequence==0))
             throw new InvalidDataException("Invalid frame fields");
         if(type==MessageType.Frame) {
             if(length==0 || sequence==0 || !IsSupportedImage(w,h,format) || rotation!=0)
                 throw new InvalidDataException("Expected supported PNG/JPEG image dimensions, rotation 0");
-        } else if(length!=0 || w!=0 || h!=0 || rotation!=0 || format!=0 || (type==MessageType.Hello && sequence!=0))
+        } else if((type==MessageType.Hold && captured!=0) || length!=0 || w!=0 || h!=0 || rotation!=0 || format!=0 || (type==MessageType.Hello && sequence!=0))
             throw new InvalidDataException("Invalid control packet");
     }
     public static async Task WriteAsync(Stream stream,Packet packet,CancellationToken token) {

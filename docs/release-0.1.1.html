@@ -16,5 +16,5 @@
 <p>面板关闭不等于锁屏。程序不自动唤醒或解锁、不修改系统超时；每4秒观察到主屏休眠时取消额外保活。多个窗口共享物理面板，某个会话恢复或退出可能影响其他窗口的关面板意图。有限诊断只记录固定触控与电源阶段，不记录坐标、输入文字或页面内容。</p>
 <div class="note"><strong>暂缓项：</strong>手机真正休眠或锁屏时，部分App控件仍可能不响应，尚未定位到具体控件处理机制。本轮按用户要求停止继续排查；未实现VirtualTouchscreen输入后端，也不宣称已修复所有App的锁屏交互。</div>
 <h2>验证范围</h2><p id="verification">本次提交前的桌面Release编译通过（0警告、0错误），已核对编译后文件版本0.1.1.0；内置scrcpy/Java Release编译通过，19个运行时文件的SHA256与manifest一致，PowerShell安装器脚本语法和git diff --check通过。按用户要求，不自动运行测试、GUI、安装器或手机操作。关面板点击的结果来自用户手动验证，不代表全部设备、App或真正锁屏场景均已通过。</p>
-<p><a href="review-followup-2026-10-20.html">逐项审查处理记录</a> · <a href="windows-packaging.html">构建安装包</a></p>
+<p><a href="windows-packaging.html">构建安装包</a></p>
 </body></html>

@@ -10,6 +10,18 @@ internal static class ShutdownChecks {
         var result=await completed.TryStopAsync([new("refresh",()=>Task.FromException(backgroundFailure))],()=>Task.CompletedTask,()=>false,SetInteraction);
         Check(result.CanClose && result.Failures.Single().Error==backgroundFailure,"a completed failed refresh is reported without blocking shutdown");
         Check(rootEnabled && navigationEnabled,"shutdown always restores both root and navigation interaction");
+        var custom=new ShutdownCoordinator(TimeSpan.FromMilliseconds(100));
+        Check(custom.WaitLimit==TimeSpan.FromMilliseconds(100),"UI observes the configured shutdown deadline");
+        Check(new ShutdownCoordinator(TimeSpan.Zero).WaitLimit==TimeSpan.FromSeconds(15),"UI observes the normalized default deadline for an invalid timeout");
+        var pendingWrite=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);int starts=0;
+        IReadOnlyList<ShutdownWork> customWork=[new("custom deadline",()=>{starts++;return pendingWrite.Task;})];
+        try {
+            var timed=await custom.TryStopAsync(customWork,()=>Task.CompletedTask,()=>false,SetInteraction).WaitAsync(TimeSpan.FromSeconds(3));
+            Check(!timed.CanClose && timed.Failures.Single().Error is TimeoutException && rootEnabled && navigationEnabled && !custom.IsStopping,"custom deadline times out without dropping work ownership and restores interaction");
+            pendingWrite.SetResult();
+            var recovered=await custom.TryStopAsync(customWork,()=>Task.CompletedTask,()=>false,SetInteraction).WaitAsync(TimeSpan.FromSeconds(3));
+            Check(recovered.CanClose && starts==1,"completed timed-out work allows retry without repeating shutdown work");
+        } finally {pendingWrite.TrySetResult();}
 
         var retry=new ShutdownCoordinator();var owned=true;var stopCalls=0;var readerCalls=0;
         IReadOnlyList<ShutdownWork> work=[new("reader",()=>{readerCalls++;return Task.FromException(new IOException("historical reader failure"));})];

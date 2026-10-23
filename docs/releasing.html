@@ -23,7 +23,7 @@
 <li>先创建草稿 Release，再上传三个附件；只有 GitHub 返回的文件大小、状态和 SHA-256 均与本地一致后才公开，并设为最新版。</li>
 <li>输出最终 Release 链接。构建详细日志保存在 <code>.cache/releases/&lt;版本&gt;/build.log</code>，避免把长日志发送给助手。</li>
 </ol>
-<p>默认提交所有已跟踪文件的改动，以及 desktop、android-agent、camera-agent、tools、packaging、third_party 下的新源码文件。未跟踪的文档草稿不会自动加入；本地已有的 main-window-redesign.html、app-card-options.html 等草稿保持原状。新文档需显式加入：</p>
+<p>默认提交所有已跟踪文件的改动，以及 desktop、android-agent、camera-agent、tools、packaging、third_party 下的新源码文件。本地审查、设计、团队和内部过程资料统一放在被 Git 忽略的 .local/，不进入公开文档或发布包。docs/ 只保留公开 HTML；未跟踪文件不会自动加入，新公开文档需显式加入：</p>
 <pre><code>.\tools\Release-Desktop.ps1 -Version 0.3 -Changes '更新说明' -Include docs/new-guide.html</code></pre>
 <p>若 <code>docs/release-&lt;版本&gt;.html</code> 已存在，脚本保留其内容；GitHub Release 的要点取自 <code>-Changes</code>。</p>
 <h2>省掉哪些步骤</h2>

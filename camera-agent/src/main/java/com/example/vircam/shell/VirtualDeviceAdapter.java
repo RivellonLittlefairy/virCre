@@ -164,7 +164,7 @@ final class VirtualDeviceAdapter implements AutoCloseable {
                 // Android 16 CameraService maps the virtual back camera to "0" for device contexts.
                 "cameraId", "0", "registeredCameraId", cameraId(), "seed", seed,
                 "inputMode",desktopMode ? "desktop" : "pattern", "inputSocket",desktopMode ? desktop.socketName : "",
-                "inputWidth",inputWidth,"inputHeight",inputHeight,"inputFormat",inputFormat,
+                "inputWidth",inputWidth,"inputHeight",inputHeight,"inputFormat",inputFormat,"inputRepeat",true,"inputHoldLastFrame",true,
                 "displayWidth",displayWidth,"displayHeight",displayHeight);
     }
 
@@ -184,9 +184,9 @@ final class VirtualDeviceAdapter implements AutoCloseable {
             int marker = counter++ & 0xffff;
             if(desktop==null) pattern.render(marker);
             else {
-                com.example.vircam.core.LatestFrame.Snapshot<android.graphics.Bitmap> image=desktop.frames.snapshot(now,1500);
-                pattern.renderDesktop(image==null ? null : image.value);
-                if (last == null) AgentLog.event("desktop-camera-first-frame", "streamId", streamId, "hasInput", image != null);
+                com.example.vircam.core.DesktopFrameRenderer.renderHolding(desktop.frames,now,pattern,hasInput->{
+                    if (last == null) AgentLog.event("desktop-camera-first-frame", "streamId", streamId, "hasInput", hasInput);
+                });
             }
             lastFrames.put(streamId, now);
             if(desktop==null) AgentLog.event("frame-submitted", "streamId", streamId, "requestId", args[1], "marker", marker);

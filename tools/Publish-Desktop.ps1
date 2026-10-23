@@ -1,6 +1,6 @@
 #requires -Version 7.0
 param([string]$OutputDirectory,[ValidateSet('Official','Custom')][string]$Runtime='Official',[switch]$SkipTests,
-    [ValidateSet('desktop-shortcuts.html','windows-ime-preview.html','virtual-camera-window.html')][string]$GuidePage,
+    [ValidateSet('desktop-shortcuts.html','virtual-camera-window.html')][string]$GuidePage,
     [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')][string]$Version,[switch]$SkipComplianceVerification)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
@@ -19,21 +19,10 @@ if($Version) {
 & dotnet @publishArgs
 if($LASTEXITCODE -ne 0) {throw 'Desktop publish failed'}
 if(-not $SkipTests) {& (Join-Path $PSScriptRoot 'Test-DesktopPublish.ps1') -OutputDirectory $OutputDirectory}
-$publishedDocs=Join-Path $OutputDirectory 'docs'
-New-Item -ItemType Directory -Force -Path $publishedDocs | Out-Null
 # Local design drafts may be open in another task. Ship only version-controlled
 # documentation, including newly staged release notes, without touching those drafts.
-$docPaths=@((& git -C $repo -c core.quotepath=false ls-files -z -- docs) -join "`n") -split "`0"
-if($LASTEXITCODE -ne 0) {throw 'Cannot enumerate version-controlled documentation'}
-foreach($relative in $docPaths) {
-    if($relative -notmatch '^docs/' -or $relative -match '(^|/)code-review-[^/]*\.md$') {continue}
-    $source=Join-Path $repo $relative
-    if(-not(Test-Path -LiteralPath $source -PathType Leaf)) {continue}
-    $destination=Join-Path $OutputDirectory $relative
-    New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
-    Copy-Item -LiteralPath $source -Destination $destination -Force
-}
-$selectedGuide=if($GuidePage) {$GuidePage} elseif($Runtime -eq 'Custom') {'windows-ime-preview.html'} else {'desktop-shortcuts.html'}
+& (Join-Path $PSScriptRoot 'Sync-PublishedDocs.ps1') -RepositoryRoot $repo -OutputDirectory $OutputDirectory
+$selectedGuide=if($GuidePage) {$GuidePage} elseif($Runtime -eq 'Custom') {'virtual-camera-window.html'} else {'desktop-shortcuts.html'}
 $guide='<meta charset="utf-8"><meta http-equiv="refresh" content="0;url=docs/'+$selectedGuide+'"><a href="docs/'+$selectedGuide+'">打开使用说明</a>'
 Set-Content -LiteralPath (Join-Path $OutputDirectory '使用说明.html') -Value $guide -Encoding utf8
 & (Join-Path $PSScriptRoot 'Prepare-DistributionCompliance.ps1') -OutputDirectory $OutputDirectory

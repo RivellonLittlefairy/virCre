@@ -11,7 +11,7 @@ import java.io.IOException;
 
 /** One authenticated local client and one decoded image. No network listener on the phone. */
 final class DesktopReceiver implements AutoCloseable {
-    final LatestFrame<Bitmap> frames=new LatestFrame<>();
+    final LatestFrame<Bitmap> frames=new LatestFrame<>(image->{if(!image.isRecycled())image.recycle();});
     final String socketName;
     private final String session;
     private final int deviceId;
@@ -38,7 +38,7 @@ final class DesktopReceiver implements AutoCloseable {
                 phase="hello";
                 FrameProtocol.Packet hello=FrameProtocol.read(socket.getInputStream(),session,deviceId);
                 if(hello.type!=FrameProtocol.HELLO) throw new IOException("HELLO required");
-                frames.resetConnection();ack(socket,0);
+                frames.beginConnection();ack(socket,0);
                 AgentLog.event("input-connected");
                 long lastSequence=0;boolean active=false;
                 while(!closed) {
@@ -53,14 +53,16 @@ final class DesktopReceiver implements AutoCloseable {
                         if(packet.width!=inputWidth || packet.height!=inputHeight || packet.format!=inputFormat
                                 || bounds.outWidth!=inputWidth || bounds.outHeight!=inputHeight || !mime.equals(bounds.outMimeType))
                             throw new IOException("Invalid image dimensions/format");
-                        BitmapFactory.Options decode=new BitmapFactory.Options();
-                        decode.inPreferredConfig=Bitmap.Config.ARGB_8888;
-                        Bitmap image=BitmapFactory.decodeByteArray(packet.payload,0,packet.payload.length,decode);
+                        Bitmap image=decodeImage(packet.payload);
                         if(image==null || !frames.offer(packet.sequence,SystemClock.elapsedRealtime(),image))
                             throw new IOException("Image decode/replay rejected");
                         active=true;
                         AgentLog.event("input-frame","sequence",packet.sequence,"capturedUtcMs",packet.capturedUtcMs,
                                 "bytes",packet.payload.length);
+                    } else if(packet.type==FrameProtocol.REPEAT) {
+                        if(!frames.repeat(packet.sequence,SystemClock.elapsedRealtime()))throw new IOException("Repeat requires a current frame");
+                    } else if(packet.type==FrameProtocol.HOLD) {
+                        if(!frames.hold(packet.sequence))throw new IOException("Hold sequence rejected");
                     } else if(packet.type==FrameProtocol.PAUSE || packet.type==FrameProtocol.STOP) {
                         frames.pause();
                         if(active) AgentLog.event("input-paused","sequence",packet.sequence);
@@ -72,8 +74,25 @@ final class DesktopReceiver implements AutoCloseable {
                 }
             } catch(Exception e) {
                 if(!closed) AgentLog.event("input-disconnected","reason",e.getClass().getSimpleName(),"phase",phase);
-            } finally { frames.pause();client=null; }
+            } finally { client=null; } // Automatic transport failure retains this session's image.
         }
+    }
+    private Bitmap decodeImage(byte[] payload) {
+        // Only the spare is writable. GL holds the current frame's mailbox lock
+        // until tex(Sub)Image2D has finished reading pixels; presentation never holds it.
+        Bitmap spare=frames.takeReusable(),image=null;
+        BitmapFactory.Options decode=new BitmapFactory.Options();
+        decode.inPreferredConfig=Bitmap.Config.ARGB_8888;decode.inMutable=true;decode.inBitmap=spare;
+        try {
+            try {image=BitmapFactory.decodeByteArray(payload,0,payload.length,decode);}
+            catch(IllegalArgumentException incompatible) {
+                if(spare==null)throw incompatible;
+                // Some ROM decoders reject reusable storage. Retry once without it.
+                spare.recycle();spare=null;decode.inBitmap=null;
+                image=BitmapFactory.decodeByteArray(payload,0,payload.length,decode);
+            }
+            return image;
+        } finally {if(spare!=null && image!=spare && !spare.isRecycled())spare.recycle();}
     }
     private void ack(LocalSocket socket,long sequence) throws IOException {
         FrameProtocol.write(socket.getOutputStream(),FrameProtocol.control(FrameProtocol.ACK,session,deviceId,sequence));
@@ -83,5 +102,6 @@ final class DesktopReceiver implements AutoCloseable {
         try { if(client!=null) client.close(); } catch(IOException ignored) { }
         try { server.close(); } catch(IOException ignored) { }
         try { worker.join(1000); } catch(InterruptedException e) { Thread.currentThread().interrupt(); }
+        frames.close();
     }
 }

@@ -39,7 +39,7 @@ public sealed class AgentPhoneCatalog(IPhoneCatalog devices, ICommandRunner runn
                 _ = new ShortcutRequest("device", "", "device", package, name).Encode();
                 if (apps.ContainsKey(package)) throw CatalogErrors.Format("应用列表包名重复。");
                 string? icon = null;
-                if (item.TryGetProperty("png", out var encoded)) {
+                if (item.TryGetProperty("png", out var encoded) && encoded.ValueKind == JsonValueKind.String) {
                     try {
                         var png = Convert.FromBase64String(encoded.GetString()!);
                         IconFile.ValidatePng(png);

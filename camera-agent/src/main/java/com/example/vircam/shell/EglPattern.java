@@ -14,9 +14,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import com.example.vircam.core.FrameMarker;
+import com.example.vircam.core.TextureRevision;
+import com.example.vircam.core.DesktopFrameRenderer;
 
 /** One instance per configured stream. All calls belong to the callback executor. */
-final class EglPattern implements AutoCloseable {
+final class EglPattern implements AutoCloseable, DesktopFrameRenderer.Target<Bitmap> {
     private final int width;
     private final int height;
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
@@ -25,7 +27,8 @@ final class EglPattern implements AutoCloseable {
     private final Surface surface;
     private int texture,program;
     private boolean closed;
-    private Bitmap uploaded,placeholder;
+    private Bitmap placeholder;
+    private final TextureRevision uploaded=new TextureRevision();
     private final FloatBuffer vertices=buffer(new float[]{-1,-1,1,-1,-1,1,1,1});
     private final FloatBuffer coordinates=buffer(new float[]{0,1,1,1,0,0,1,0});
 
@@ -80,14 +83,8 @@ final class EglPattern implements AutoCloseable {
         present();
     }
 
-    void renderDesktop(Bitmap image) {
+    @Override public void beginDesktop() {
         current();
-        if(image==null) {
-            if(placeholder==null) {
-                placeholder=pauseBitmap();
-            }
-            image=placeholder;
-        }
         if(program==0) {
             int vertex=shader(GLES20.GL_VERTEX_SHADER,"attribute vec2 aPosition;attribute vec2 aUv;varying vec2 uv;void main(){gl_Position=vec4(aPosition,0.,1.);uv=aUv;}");
             int fragment=shader(GLES20.GL_FRAGMENT_SHADER,"precision mediump float;varying vec2 uv;uniform sampler2D picture;void main(){gl_FragColor=texture2D(picture,uv);}");
@@ -104,7 +101,19 @@ final class EglPattern implements AutoCloseable {
         }
         GLES20.glViewport(0,0,width,height);GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
         GLES20.glUseProgram(program);GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
-        if(uploaded!=image) { GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,image,0);uploaded=image; }
+    }
+
+    @Override public void uploadDesktop(Bitmap image,long revision) {
+        if(image==null) {
+            if(placeholder==null)placeholder=pauseBitmap();
+            image=placeholder;
+        }
+        int upload=uploaded.update(revision,image.getWidth(),image.getHeight());
+        if(upload==2)GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,image,0);
+        else if(upload==1)GLUtils.texSubImage2D(GLES20.GL_TEXTURE_2D,0,0,0,image);
+    }
+
+    @Override public void presentDesktop() {
         int position=GLES20.glGetAttribLocation(program,"aPosition"),uv=GLES20.glGetAttribLocation(program,"aUv");
         GLES20.glEnableVertexAttribArray(position);GLES20.glEnableVertexAttribArray(uv);
         GLES20.glVertexAttribPointer(position,2,GLES20.GL_FLOAT,false,0,vertices);
@@ -185,6 +194,7 @@ final class EglPattern implements AutoCloseable {
             display = EGL14.EGL_NO_DISPLAY;
             context = EGL14.EGL_NO_CONTEXT;
             window = EGL14.EGL_NO_SURFACE;
+            if(placeholder!=null) {AgentLog.cleanup("camera-placeholder", placeholder::recycle);placeholder=null;}
             AgentLog.cleanup("camera-surface", surface::release);
         }
     }

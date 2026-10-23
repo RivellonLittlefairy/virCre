@@ -11,4 +11,4 @@ pwsh -NoProfile -File tools/Test-CustomScrcpy.ps1</pre>
 <p>脚本自动修补本机未能创建的 GCC/LD/LTO 文件别名，使用普通文件副本，不要求管理员创建链接。临时文件写入项目缓存；脚本退出时恢复进程环境，不修改系统环境变量。</p>
 <p>server 按 AIDL、javac、D8 顺序从源码生成，最低 API 为 36；客户端与 server 都使用 5.0.1 进行协议版本核对。runtime-manifest.json 的 distribution 为 <code>vircre-source-build</code>，包含整个源码目录的内容指纹及每个发布文件的 SHA-256。后续输入法代码变动后必须重新构建。</p>
 <p>独立运行验证会清空编译工具与用户工具的 PATH，仅保留 Windows System32，再执行客户端版本查询。这样可以发现开发机有 DLL、发布目录却没有的遗漏。</p>
-<p><a href="windows-ime-plan.html">输入法实施计划</a> · <a href="windows-ime-design.html">输入法设计</a></p></body></html>
+</body></html>

@@ -12,7 +12,7 @@ if(-not $ToolchainDirectory) {$ToolchainDirectory=Join-Path $repoDirectory '.cac
 $ToolchainDirectory=[IO.Path]::GetFullPath($ToolchainDirectory)
 $toolBin=Join-Path $ToolchainDirectory 'bin'
 foreach($tool in @('cc.exe','meson.exe','ninja.exe','pkgconf.exe')) {
-    if(-not(Test-Path -LiteralPath (Join-Path $toolBin $tool))) {throw "Portable UCRT64 toolchain is missing $tool; see docs/windows-ime-plan.html"}
+    if(-not(Test-Path -LiteralPath (Join-Path $toolBin $tool))) {throw "Portable UCRT64 toolchain is missing $tool; see docs/scrcpy-development.html"}
 }
 # MSYS2 package aliases may fail to materialize as hard links on Windows. Copy only the compiler alias needed by windres.
 if(-not(Test-Path -LiteralPath (Join-Path $toolBin 'gcc.exe'))) {Copy-Item -LiteralPath (Join-Path $toolBin 'cc.exe') -Destination (Join-Path $toolBin 'gcc.exe')}
@@ -72,7 +72,7 @@ try {
     if($LASTEXITCODE -ne 0) {throw 'Display AIDL compilation failed'}
     $cameraSourceRoot=Join-Path $repoDirectory 'camera-agent\src\main\java\com\example\vircam'
     $cameraSources=@(Get-ChildItem -LiteralPath (Join-Path $cameraSourceRoot 'shell') -Filter '*.java')
-    foreach($cameraCore in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java')) {$cameraSources+=Get-Item -LiteralPath (Join-Path $cameraSourceRoot "core\$cameraCore")}
+    foreach($cameraCore in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java','TextureRevision.java','DesktopFrameRenderer.java')) {$cameraSources+=Get-Item -LiteralPath (Join-Path $cameraSourceRoot "core\$cameraCore")}
     $javaSources=@(Get-ChildItem -LiteralPath (Join-Path $sourceDirectory 'server\src\main\java'),$generated -Filter '*.java' -Recurse | ForEach-Object {'"'+$_.FullName.Replace('\','/')+'"'})
     $javaSources+=@($cameraSources | ForEach-Object {'"'+$_.FullName.Replace('\','/')+'"'})
     $javaArgs=Join-Path $serverBuild 'javac.args'

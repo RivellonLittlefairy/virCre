@@ -9,7 +9,7 @@ public sealed class ShutdownCoordinator(TimeSpan? timeout=null) {
     public bool HasStarted {get;private set;}
     public bool IsStopping {get;private set;}
     private Task<ShutdownResult>? attempt;
-    private readonly TimeSpan waitLimit=timeout is { } value && value>TimeSpan.Zero?value:TimeSpan.FromSeconds(15);
+    public TimeSpan WaitLimit {get;}=timeout is { } value && value>TimeSpan.Zero?value:TimeSpan.FromSeconds(15);
     private (string Name,Task<ShutdownFailure?> Completion)[]? backgroundTasks;
     private Task<ShutdownFailure?>? windowCompletion;
     public Task<ShutdownResult> TryStopAsync(IReadOnlyList<ShutdownWork> background,Func<Task> stopWindows,Func<bool> hasWindows,Action<bool> setInteraction) {
@@ -28,14 +28,14 @@ public sealed class ShutdownCoordinator(TimeSpan? timeout=null) {
             backgroundTasks??=background.Select(work=>(Name:work.Name,Completion:ObserveAsync(work))).ToArray();
             if(windowCompletion is not {IsCompleted:false})windowCompletion=ObserveAsync(new("app-windows",stopWindows));
             var tracked=backgroundTasks.Append((Name:"app-windows",Completion:windowCompletion)).ToArray();
-            try {await Task.WhenAll(tracked.Select(work=>work.Completion)).WaitAsync(waitLimit);}
+            try {await Task.WhenAll(tracked.Select(work=>work.Completion)).WaitAsync(WaitLimit);}
             catch(TimeoutException) { /* Work retains ownership and may finish before the next close attempt. */ }
             var failures=new List<ShutdownFailure>();
             var pending=false;
             foreach(var work in tracked) {
                 if(!work.Completion.IsCompleted) {
                     pending=true;
-                    failures.Add(new(work.Name,new TimeoutException($"收尾任务 {work.Name} 等待超过 {waitLimit.TotalSeconds:0.#} 秒，仍在后台结束。")));
+                    failures.Add(new(work.Name,new TimeoutException($"收尾任务 {work.Name} 等待超过 {WaitLimit.TotalSeconds:0.#} 秒，仍在后台结束。")));
                 } else if(await work.Completion is { } failure)failures.Add(failure);
             }
             result=new(!pending && !hasWindows(),failures);

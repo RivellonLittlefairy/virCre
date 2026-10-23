@@ -13,7 +13,7 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
     private readonly ICommandRunner runner=new CommandRunner(tools);
     private readonly string session=Guid.NewGuid().ToString("N");
     private readonly string mac=CreateMac();
-    private readonly TaskCompletionSource<(int Device,int Display,int Width,int Height,int Format)> ready=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<(int Device,int Display,int Width,int Height,int Format,bool SupportsRepeat,bool SupportsHoldLastFrame)> ready=new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool associationAttempted,forwardAttempted,agentAttempted;
     private int remotePid;
     private string cameraState="等待应用打开虚拟相机";
@@ -49,7 +49,7 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
         var portText=await AdbAsync(["forward","tcp:0",Socket],token).ConfigureAwait(false);
         if(!int.TryParse(portText.Trim(),NumberStyles.None,CultureInfo.InvariantCulture,out var port) || port<1 || port>65535)
             throw new IOException("无法取得摄像头数据通道端口。");
-        return new(session,port,metadata.Device,metadata.Display,request.Serial,metadata.Width,metadata.Height,metadata.Format);
+        return new(session,port,metadata.Device,metadata.Display,request.Serial,metadata.Width,metadata.Height,metadata.Format,metadata.SupportsRepeat,metadata.SupportsHoldLastFrame);
     }
     internal void ObserveServerLine(string line) {
         try {
@@ -69,7 +69,9 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
                     if(!FrameProtocol.IsSupportedImage(width,height,format) || format!=FrameProtocol.FormatJpeg ||
                         width!=root.GetProperty("displayWidth").GetInt32() || height!=root.GetProperty("displayHeight").GetInt32())
                         throw new IOException("内置相机组件画面格式不匹配，请使用完整新版目录。");
-                    ready.TrySetResult((device,display,width,height,format));
+                    bool supportsRepeat=root.TryGetProperty("inputRepeat",out var repeat) && repeat.ValueKind==JsonValueKind.True;
+                    bool holdLast=root.TryGetProperty("inputHoldLastFrame",out var hold) && hold.ValueKind==JsonValueKind.True;
+                    ready.TrySetResult((device,display,width,height,format,supportsRepeat,holdLast));
                 }
                 if(kind.GetString()=="failed")ready.TrySetException(new IOException("手机无法创建虚拟摄像头，请检查 Android 版本和系统支持。"));
                 string? state=kind.GetString() switch {

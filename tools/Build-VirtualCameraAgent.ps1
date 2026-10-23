@@ -5,7 +5,7 @@ $repo=Split-Path $PSScriptRoot -Parent
 $sourceRoot=Join-Path $repo 'camera-agent\src\main\java\com\example\vircam'
 $output=Join-Path $repo 'android-agent\build\virtual-camera'
 $sources=@(Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'shell') -Filter '*.java')
-foreach($name in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java')) {$sources+=Get-Item -LiteralPath (Join-Path $sourceRoot "core\$name")}
+foreach($name in @('FrameProtocol.java','LatestFrame.java','FrameMarker.java','TextureRevision.java','DesktopFrameRenderer.java')) {$sources+=Get-Item -LiteralPath (Join-Path $sourceRoot "core\$name")}
 $jar=Join-Path $output 'virtual-camera-agent.jar'
 $latestSource=(@($sources)+@(Get-Item -LiteralPath $PSCommandPath) | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
 if((Test-Path -LiteralPath $jar) -and (Get-Item -LiteralPath $jar).LastWriteTimeUtc -ge $latestSource) {return}
