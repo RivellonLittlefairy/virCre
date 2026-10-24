@@ -18,6 +18,8 @@ public sealed partial class MainWindow : Window {
     private bool allowClose;
     private readonly ShutdownCoordinator windowShutdown=new();
 
+    /// <summary>Read-only surface for compiled bindings; the window never replaces the model.</summary>
+    public ShellViewModel Model => model;
     public MainWindow(bool shortcutOnly=false) {
         this.shortcutOnly=shortcutOnly;
         windowHost=new(stage=>RuntimeDiagnostics.Write(stage.StartsWith("touch-",StringComparison.Ordinal)?"touch-stage":stage.StartsWith("power-",StringComparison.Ordinal)?"power-stage":"input-rejected",details:stage),message=>{
@@ -200,12 +202,7 @@ public sealed partial class MainWindow : Window {
     private void RenderState() {
         if (!ready || closing) return;
         var cleanupOnly=windowShutdown.HasStarted;
-        PageTitle.Text = model.Title;
         PageTitle.Visibility=model.Page is "settings" or "running"?Visibility.Visible:Visibility.Collapsed;
-        AppCount.Text = model.ResultCount;
-        AllNavCount.Text=model.CatalogCount.ToString();
-        FavoriteNavCount.Text=model.FavoriteCount.ToString();
-        RunningNavCount.Text=model.RunningCount.ToString();
         var device=DevicePicker.SelectedItem as PhoneDevice;
         DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" :
             device is {State:DeviceState.Online}?$"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}":"连接后选择设备";
