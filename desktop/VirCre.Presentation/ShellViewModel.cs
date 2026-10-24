@@ -29,15 +29,19 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public int CameraFrameRate {get;private set;} = CameraFrameRates.Default;
     public UserSettings ExportSettings() => new(favorites.Order(StringComparer.Ordinal).ToArray(),Theme,
         VirtualCameraEnabled:VirtualCameraEnabled,CameraFrameRate:CameraFrameRate);
-    public void SetTheme(string theme) {Theme=theme is "Light" or "Dark"?theme:"System";SettingsChanged?.Invoke();}
+    public void SetTheme(string theme) {
+        theme=theme is "Light" or "Dark"?theme:"System";
+        if(Theme==theme)return;
+        Theme=theme;Notify(nameof(Theme));SettingsChanged?.Invoke();
+    }
     public void SetVirtualCameraEnabled(bool enabled) {
         if(VirtualCameraEnabled==enabled)return;
-        VirtualCameraEnabled=enabled;SettingsChanged?.Invoke();
+        VirtualCameraEnabled=enabled;Notify(nameof(VirtualCameraEnabled));SettingsChanged?.Invoke();
     }
     public void SetCameraFrameRate(int frameRate) {
         frameRate=CameraFrameRates.Validate(frameRate);
         if(CameraFrameRate==frameRate)return;
-        CameraFrameRate=frameRate;SettingsChanged?.Invoke();
+        CameraFrameRate=frameRate;Notify(nameof(CameraFrameRate));SettingsChanged?.Invoke();
     }
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
     public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
@@ -148,6 +152,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         }
         NotifyState();
     }
+    private void Notify(string property) => PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(property));
     private void NotifyState() {
         foreach(var property in new[]{nameof(Page),nameof(Query),nameof(Title),nameof(Description),nameof(IsEmpty),nameof(ResultCount),nameof(EmptyTitle),nameof(EmptyDescription),
             nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ErrorMessage),nameof(FooterText),nameof(CatalogCount),nameof(FavoriteCount),nameof(RunningCount)})

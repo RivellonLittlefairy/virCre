@@ -105,6 +105,42 @@ using(var persistedController=new CatalogController(new ImmediateCatalog(),saved
 }
 Console.WriteLine("PASS: saved favorites, real icons and theme survive catalog replacement");
 
+var preferenceModel = new ShellViewModel(settings: new([], "System"));
+var preferenceNotifications = new List<string?>();
+var preferenceSaves = 0;
+string? themeSeen = null;
+bool? cameraSeen = null;
+int? frameRateSeen = null;
+preferenceModel.PropertyChanged += (_, change) => {
+    preferenceNotifications.Add(change.PropertyName);
+    if (change.PropertyName == nameof(ShellViewModel.Theme)) themeSeen = preferenceModel.Theme;
+    else if (change.PropertyName == nameof(ShellViewModel.VirtualCameraEnabled)) cameraSeen = preferenceModel.VirtualCameraEnabled;
+    else if (change.PropertyName == nameof(ShellViewModel.CameraFrameRate)) frameRateSeen = preferenceModel.CameraFrameRate;
+};
+preferenceModel.SettingsChanged += () => preferenceSaves++;
+preferenceModel.SetTheme("Dark");
+preferenceModel.SetTheme("Dark");
+Require(preferenceNotifications.Count == 1 && themeSeen == "Dark" && preferenceSaves == 1,
+    "A theme change must notify once with the new value and save once");
+preferenceModel.SetTheme("Sepia");
+Require(preferenceModel.Theme == "System" && themeSeen == "System" && preferenceSaves == 2,
+    "An unknown theme must normalize, notify and save");
+preferenceModel.SetVirtualCameraEnabled(false);
+preferenceModel.SetVirtualCameraEnabled(false);
+Require(preferenceNotifications.Count == 3 && cameraSeen == false && preferenceSaves == 3,
+    "A camera toggle must notify once without duplicating the save");
+preferenceModel.SetCameraFrameRate(24);
+preferenceModel.SetCameraFrameRate(24);
+Require(preferenceNotifications.Count == 4 && frameRateSeen == 24 && preferenceSaves == 4,
+    "A frame rate change must notify once without duplicating the save");
+var rejectedFrameRate = false;
+try { preferenceModel.SetCameraFrameRate(0); }
+catch (ArgumentOutOfRangeException) { rejectedFrameRate = true; }
+Require(rejectedFrameRate && preferenceModel.CameraFrameRate == 24 && preferenceSaves == 4,
+    "An invalid frame rate must be rejected without notifying or saving");
+Require(!preferenceNotifications.Contains(nameof(ShellViewModel.Page)), "Preference changes must not broadcast unrelated state");
+Console.WriteLine("PASS: preference setters notify only real changes and save once each");
+
 var shutdownModel = new ShellViewModel();
 var shutdownSource = new ControlledCatalog();
 var shutdownController = new CatalogController(shutdownSource, shutdownModel);
