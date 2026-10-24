@@ -21,7 +21,7 @@ public sealed partial class MainWindow {
     }
     private void RenderCameraCompatibility(bool cleanupOnly) {
         // A camera on another connected phone may still be running, so its FPS stays adjustable.
-        var state=CameraCompatibilityState.Create(DevicePicker.SelectedItem as PhoneDevice,model.VirtualCameraEnabled,
+        var state=CameraCompatibilityState.Create(devices.State.Selected,model.VirtualCameraEnabled,
             appWindows.Windows.Any(window=>window.IsVirtualCamera),cleanupOnly);
         syncingCameraSettings=true;
         try {VirtualCameraToggle.IsOn=state.ToggleChecked;}

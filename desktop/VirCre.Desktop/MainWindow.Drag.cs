@@ -50,7 +50,7 @@ public sealed partial class MainWindow {
         if(args.Pointer.PointerDeviceType==Microsoft.UI.Input.PointerDeviceType.Touch)return;
         for(var current=args.OriginalSource as DependencyObject;current!=null && !ReferenceEquals(current,sender);current=VisualTreeHelper.GetParent(current))
             if(current is ButtonBase button && button.Tag is not AppCard) return;
-        dragGesture=new(source,args.Pointer.PointerId,args.GetCurrentPoint(source).Position,DevicePicker.SelectedItem as PhoneDevice,dragOwnership.Begin());
+        dragGesture=new(source,args.Pointer.PointerId,args.GetCurrentPoint(source).Position,devices.State.Selected,dragOwnership.Begin());
     }
     private void AppCard_PointerReleased(object sender,PointerRoutedEventArgs args) {
         if(dragGesture?.Pointer!=args.Pointer.PointerId) return;

@@ -74,7 +74,7 @@ public sealed partial class MainWindow {
     private async void CreateShortcut_Click(object sender,RoutedEventArgs args) {
         if((sender as MenuFlyoutItem)?.Tag is not AppCard card) return;
         try {
-            var created=await PrepareShortcutAsync(card,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),desktop:true,device:DevicePicker.SelectedItem as PhoneDevice);
+            var created=await PrepareShortcutAsync(card,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),desktop:true,device:devices.State.Selected);
             if(!created.Staged) ShowAction("已创建桌面快捷方式："+Path.GetFileNameWithoutExtension(created.Path));
             else {
                 ShowAction("桌面暂不可写，快捷方式已生成。可打开所在文件夹，将它拖到桌面。");

@@ -22,11 +22,11 @@ public sealed partial class MainWindow {
     }
     private AppLaunchService? appLaunches;
     private AppLaunchService AppLaunches => appLaunches??=new(appWindows);
-    private bool CanActOnCard(AppCard card,PhoneDevice? device) =>
-        AppActionGuard.CanActOn(card,device,model,scanning,closing || windowShutdown.HasStarted);
+    private bool CanActOnCard(AppCard card,PhoneDevice? device=null) =>
+        AppActionGuard.CanActOn(card,device??devices.State.Selected,model,devices.State,closing || windowShutdown.HasStarted);
     private async Task OpenCardAsync(AppCard card) {
         if (closing || windowShutdown.HasStarted) return;
-        var device=DevicePicker.SelectedItem as PhoneDevice;
+        var device=devices.State.Selected;
         if (device is null || !CanActOnCard(card,device)) {
             ShowAction("设备或应用列表已经变化，请刷新后重新选择。", true);return;
         }

@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window {
         RuntimeDiagnostics.Write("startup",details:DataDirectory);
         model = new(settings: settings.Settings);
         catalogController = new(phone, model);
+        devices = new(phone, catalogController, model);
         InitializeComponent();
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory,"Assets","Brand","vircre.ico"));
         ExtendsContentIntoTitleBar = true;
@@ -49,6 +50,7 @@ public sealed partial class MainWindow : Window {
         Root.RequestedTheme = model.Theme switch {"Light"=>ElementTheme.Light,"Dark"=>ElementTheme.Dark,_=>ElementTheme.Default};
         model.SettingsChanged += SaveSettings;
         phone.Warning += message => DispatcherQueue.TryEnqueue(() => ShowAction(message));
+        devices.Changed += Devices_Changed;
         appWindows.Changed += AppWindows_Changed;
         appWindows.Problem += AppWindows_Problem;
         ready = true;
@@ -59,6 +61,8 @@ public sealed partial class MainWindow : Window {
             closing = true;
             statusMessageTimer?.Stop();
             lifetime.Cancel();
+            devices.Changed -= Devices_Changed;
+            devices.Dispose();
             catalogController.Dispose();
             appWindows.Changed -= AppWindows_Changed;
             appWindows.Problem -= AppWindows_Problem;
@@ -81,7 +85,7 @@ public sealed partial class MainWindow : Window {
         try {
             var result=await windowShutdown.TryStopAsync([
                 new("lifetime",()=>{lifetime.Cancel();return Task.CompletedTask;}),
-                new("catalog",catalogController.StopAsync),new("refresh",()=>refreshTask),
+                new("devices",devices.StopAsync),
                 new("settings",()=>SaveQueue.StopAsync()),new("shortcut-activation",()=>shortcutTask),
                 new("native-drag",()=>nativeDragTask),new("shortcut-writes",()=>Task.WhenAll(shortcutWrites.ToArray()))],
                 appWindows.StopAsync,()=>appWindows.Windows.Count>0,
@@ -202,8 +206,10 @@ public sealed partial class MainWindow : Window {
     private void RenderState() {
         if (!ready || closing) return;
         var cleanupOnly=windowShutdown.HasStarted;
+        var deviceState=devices.State;
+        var scanning=deviceState.Scanning;
         PageTitle.Visibility=model.Page is "settings" or "running"?Visibility.Visible:Visibility.Collapsed;
-        var device=DevicePicker.SelectedItem as PhoneDevice;
+        var device=deviceState.Selected;
         DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" :
             device is {State:DeviceState.Online}?$"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}":"连接后选择设备";
         ConnectionStatus.Text = cleanupOnly?"等待退出":model.DeviceStatus;

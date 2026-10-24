@@ -146,15 +146,17 @@ var guardDevice = new VirCre.Launcher.PhoneDevice("phone.guard","Guard",VirCre.L
 using (var guardController = new CatalogController(new ImmediateCatalog(), guardModel)) {
     await guardController.SelectAsync(guardDevice);
     var guardCard = guardModel.Apps.Single();
-    Require(AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,false,false),"A live card on the selected online phone must be actionable");
-    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,true,false),"Scanning must block card actions");
-    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,false,true),"Shutdown must block card actions");
-    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Offline},guardModel,false,false),"An offline phone must block its cards");
-    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Unauthorized},guardModel,false,false),"An unauthorized phone must block its cards");
-    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {Serial="phone.other"},guardModel,false,false),"A card must not act on a different phone");
+    var idle = new DeviceSelectionState([guardDevice],guardDevice,false);
     var otherDevice = new VirCre.Launcher.PhoneDevice("phone.other","Other",VirCre.Launcher.DeviceState.Online);
+    Require(AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,idle,false),"A live card on the selected online phone must be actionable");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,idle with {Scanning=true},false),"Scanning must block card actions");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,idle,true),"Shutdown must block card actions");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Offline},guardModel,idle,false),"An offline phone must block its cards");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Unauthorized},guardModel,idle,false),"An unauthorized phone must block its cards");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {Serial="phone.other"},guardModel,idle,false),"A card must not act on a different phone");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,idle with {Selected=otherDevice},false),"A card must not act once another phone is selected");
     await guardController.SelectAsync(otherDevice);
-    Require(!AppActionGuard.CanActOn(guardCard,otherDevice,guardModel,false,false),"A card from the previous phone must not act after switching");
+    Require(!AppActionGuard.CanActOn(guardCard,otherDevice,guardModel,idle with {Selected=otherDevice},false),"A card from the previous phone must not act after switching");
 }
 var loadingModel = new ShellViewModel();
 var loadingSource = new ControlledCatalog();
@@ -162,7 +164,8 @@ using (var loadingController = new CatalogController(loadingSource, loadingModel
     var loadingDevice = new VirCre.Launcher.PhoneDevice("phone.loading","Loading",VirCre.Launcher.DeviceState.Online);
     var loading = loadingController.SelectAsync(loadingDevice);
     Require(loadingModel.IsLoading,"Fixture must keep the catalog loading");
-    Require(!AppActionGuard.CanActOn(new AppCard("App","com.real.app","","#000000",SourceSerial:"phone.loading"),loadingDevice,loadingModel,false,false),"Loading must block card actions");
+    var loadingSelection = new DeviceSelectionState([loadingDevice],loadingDevice,false);
+    Require(!AppActionGuard.CanActOn(new AppCard("App","com.real.app","","#000000",SourceSerial:"phone.loading"),loadingDevice,loadingModel,loadingSelection,false),"Loading must block card actions");
     loadingSource.Pending["phone.loading"].SetResult([]);
     await loading;
 }
@@ -217,10 +220,113 @@ Require(!windowsModel.IsEmpty && windowsModel.Running.Count==1,"Running windows 
 windowsModel.UpdateWindows([]);
 Require(windowsModel.IsEmpty,"Closing last window must restore running empty state");
 Console.WriteLine("PASS: running windows remain independent of selected device and update empty state");
+
+var scanSource = new ScriptedPhoneCatalog();
+var scanModel = new ShellViewModel();
+using (var scanCatalog = new CatalogController(scanSource, scanModel))
+using (var scanDevices = new DeviceController(scanSource, scanCatalog, scanModel)) {
+    var phoneA = Device("p.a", "Phone A", "hw-a");
+    var phoneB = Device("p.b", "Phone B", "hw-b");
+    var firstScan = scanDevices.RefreshAsync(false, CancellationToken.None);
+    Require(scanDevices.State.Scanning, "A refresh must publish its scanning state");
+    var secondScan = scanDevices.RefreshAsync(false, CancellationToken.None);
+    scanSource.Scans[1].SetResult([phoneB]);
+    await Until(() => scanSource.HasAppRequest("p.b"));
+    scanSource.LastApps("p.b").SetResult([new("B app", "com.b.app", false)]);
+    await secondScan;
+    scanSource.Scans[0].SetResult([phoneA]);
+    await firstScan;
+    Require(scanDevices.State.Selected?.Serial == "p.b" && scanDevices.State.Devices.Count == 1 && !scanDevices.State.Scanning,
+        "A stale scan published its devices after a newer scan finished");
+    Require(scanModel.Apps.Single().PackageName == "com.b.app" && scanModel.CurrentSerial == "p.b",
+        "A stale scan overwrote the selected phone's apps");
+
+    // A wireless address change keeps the same phone when its hardware identity matches.
+    var wirelessScan = scanDevices.RefreshAsync(true, CancellationToken.None);
+    scanSource.Scans[2].SetResult([Device("p.b.wifi", "Phone B", "hw-b")]);
+    await Until(() => scanSource.HasAppRequest("p.b.wifi"));
+    scanSource.LastApps("p.b.wifi").SetResult([new("B app", "com.b.app", false)]);
+    await wirelessScan;
+    Require(scanDevices.State.Selected?.Serial == "p.b.wifi", "A known phone with a new transport was not reselected by hardware identity");
+}
+Console.WriteLine("PASS: device scans publish only the newest result and restore selection by hardware identity");
+
+var switchSource = new ScriptedPhoneCatalog();
+var switchModel = new ShellViewModel();
+using (var switchCatalog = new CatalogController(switchSource, switchModel))
+using (var switchDevices = new DeviceController(switchSource, switchCatalog, switchModel)) {
+    var staleLoad = switchDevices.SelectAsync(Device("p.a", "Phone A", "hw-a"), CancellationToken.None);
+    await Until(() => switchSource.HasAppRequest("p.a"));
+    var currentLoad = switchDevices.SelectAsync(Device("p.b", "Phone B", "hw-b"), CancellationToken.None);
+    await Until(() => switchSource.HasAppRequest("p.b"));
+    Require(switchDevices.State.Selected?.Serial == "p.b", "Selecting another phone did not publish it");
+    switchSource.LastApps("p.b").SetResult([new("B app", "com.b.app", false)]);
+    await currentLoad;
+    switchSource.LastApps("p.a").SetResult([new("A app", "com.a.app", false)]);
+    await staleLoad;
+    Require(switchModel.Apps.Single().PackageName == "com.b.app", "The previous phone's late app list overwrote the new selection");
+}
+Console.WriteLine("PASS: selecting another phone rejects the previous phone's late app list");
+
+var offlineSource = new ScriptedPhoneCatalog();
+var offlineModel = new ShellViewModel();
+using (var offlineCatalog = new CatalogController(offlineSource, offlineModel))
+using (var offlineDevices = new DeviceController(offlineSource, offlineCatalog, offlineModel)) {
+    var phone = Device("p.keep", "Phone", "hw-keep");
+    var firstLoad = offlineDevices.RefreshAsync(false, CancellationToken.None);
+    offlineSource.Scans[0].SetResult([phone]);
+    await Until(() => offlineSource.HasAppRequest("p.keep"));
+    offlineSource.LastApps("p.keep").SetResult([new("Keep", "com.keep.app", false)]);
+    await firstLoad;
+    var card = offlineModel.Apps.Single();
+    Require(AppActionGuard.CanActOn(card, offlineDevices.State.Selected, offlineModel, offlineDevices.State, false),
+        "A card from a live selected phone must be actionable");
+
+    var locked = offlineDevices.RefreshAsync(true, CancellationToken.None);
+    offlineSource.Scans[1].SetResult([phone with {State=VirCre.Launcher.DeviceState.Unauthorized}]);
+    await locked;
+    Require(offlineDevices.State.Selected?.State == VirCre.Launcher.DeviceState.Unauthorized && offlineModel.Apps.Count == 1 && !offlineModel.HasDevice,
+        "An unauthorized phone must keep the cached list but report itself disconnected");
+    Require(!AppActionGuard.CanActOn(card, offlineDevices.State.Selected, offlineModel, offlineDevices.State, false),
+        "A cached card stayed actionable while the phone was unauthorized");
+
+    var recovered = offlineDevices.RefreshAsync(true, CancellationToken.None);
+    offlineSource.Scans[2].SetResult([phone]);
+    await Until(() => offlineSource.AppRequests("p.keep") >= 2);
+    offlineSource.LastApps("p.keep").SetResult([new("Keep", "com.keep.app", false)]);
+    await recovered;
+    Require(offlineDevices.State.Selected?.State == VirCre.Launcher.DeviceState.Online && offlineModel.HasDevice && offlineModel.Apps.Count == 1,
+        "Restoring authorization did not reload the selected phone's apps");
+    Require(AppActionGuard.CanActOn(offlineModel.Apps.Single(), offlineDevices.State.Selected, offlineModel, offlineDevices.State, false),
+        "Cards must be actionable again after authorization returns");
+}
+Console.WriteLine("PASS: an unauthorized phone keeps its cache but only publishes actions after recovery");
+
+var stopSource = new ScriptedPhoneCatalog();
+var stopModel = new ShellViewModel();
+using (var stopCatalog = new CatalogController(stopSource, stopModel))
+using (var stopDevices = new DeviceController(stopSource, stopCatalog, stopModel)) {
+    var pendingScan = stopDevices.RefreshAsync(false, CancellationToken.None);
+    Require(stopDevices.State.Scanning, "Fixture must keep a scan in flight");
+    var stoppingScans = stopDevices.StopAsync();
+    Require(!stoppingScans.IsCompleted, "Stopping returned before the in-flight scan finished");
+    stopSource.Scans[0].SetResult([Device("p.a", "Phone A", "hw-a")]);
+    await stoppingScans;
+    await pendingScan;
+    Require(stopDevices.State.Selected == null && stopDevices.State.Devices.Count == 0,
+        "A device scan published after shutdown");
+}
+Console.WriteLine("PASS: shutdown waits for every in-flight device scan and rejects late results");
 await ShutdownChecks.RunAsync();
 static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 static VirCre.Launcher.PhoneDevice DeviceWithApi(int? api) =>
     new("phone.camera","Camera",VirCre.Launcher.DeviceState.Online,ApiLevel:api);
+static VirCre.Launcher.PhoneDevice Device(string serial,string model,string hardware) =>
+    new(serial,model,VirCre.Launcher.DeviceState.Online,hardware);
+static async Task Until(Func<bool> ready) {
+    for(var attempt=0;attempt<400 && !ready();attempt++)await Task.Delay(5);
+    Require(ready(),"Timed out waiting for a scripted catalog step");
+}
 
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();
@@ -233,4 +339,21 @@ sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
 sealed class ImmediateCatalog : VirCre.Launcher.IPhoneCatalog {
     public Task<IReadOnlyList<VirCre.Launcher.PhoneDevice>> GetDevicesAsync(CancellationToken token)=>throw new NotSupportedException();
     public Task<IReadOnlyList<VirCre.Launcher.PhoneApp>> GetAppsAsync(string serial,CancellationToken token)=>Task.FromResult<IReadOnlyList<VirCre.Launcher.PhoneApp>>([new("Real","com.real.app",false,"C:\\icons\\real.png")]);
+}
+/// <summary>Device and app reads complete only when the check says so, in any order.</summary>
+sealed class ScriptedPhoneCatalog : VirCre.Launcher.IPhoneCatalog {
+    private readonly Dictionary<string,List<TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>>> apps=new(StringComparer.Ordinal);
+    public List<TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneDevice>>> Scans {get;}=[];
+    public Task<IReadOnlyList<VirCre.Launcher.PhoneDevice>> GetDevicesAsync(CancellationToken token) {
+        var completion=new TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneDevice>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Scans.Add(completion);return completion.Task; // Ignores cancellation so late results reach the controller.
+    }
+    public Task<IReadOnlyList<VirCre.Launcher.PhoneApp>> GetAppsAsync(string serial,CancellationToken token) {
+        if(!apps.TryGetValue(serial,out var pending))apps[serial]=pending=[];
+        var completion=new TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        pending.Add(completion);return completion.Task;
+    }
+    public bool HasAppRequest(string serial)=>AppRequests(serial)>0;
+    public int AppRequests(string serial)=>apps.TryGetValue(serial,out var pending)?pending.Count:0;
+    public TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>> LastApps(string serial)=>apps[serial][^1];
 }
