@@ -372,6 +372,22 @@ using (var viewCatalog = new CatalogController(viewSource, viewState)) {
         "Restoring interaction must return the live device state");
 }
 Console.WriteLine("PASS: derived view state covers scanning, loading, pages and cleanup without UI types");
+
+var marshalModel = new ShellViewModel(dispatcher: new ManualDispatcher());
+var marshalDispatcher = (ManualDispatcher)marshalModel.Dispatcher;
+var marshalSource = new ScriptedPhoneCatalog();
+using (var marshalCatalog = new CatalogController(marshalSource, marshalModel)) {
+    var marshalLoad = marshalCatalog.SelectAsync(Device("p.ui", "Phone UI", "hw-ui"), CancellationToken.None);
+    Require(marshalModel.DeviceLabel != "Phone UI", "A load touched model state before the UI dispatcher ran");
+    marshalDispatcher.RunPending();
+    Require(marshalModel.DeviceLabel == "Phone UI" && marshalModel.IsLoading, "BeginLoad did not marshal to the UI thread");
+    marshalSource.LastApps("p.ui").SetResult([new("UI app", "com.ui.app", false)]);
+    await marshalLoad;
+    Require(marshalModel.Apps.Count == 0, "A completed load published without the UI dispatcher");
+    marshalDispatcher.RunPending();
+    Require(marshalModel.Apps.Single().PackageName == "com.ui.app" && !marshalModel.IsLoading, "CompleteLoad did not marshal to the UI thread");
+}
+Console.WriteLine("PASS: model and catalog publish only through the host dispatcher");
 await ShutdownChecks.RunAsync();
 static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 static VirCre.Launcher.PhoneDevice DeviceWithApi(int? api) =>
@@ -383,6 +399,13 @@ static async Task Until(Func<bool> ready) {
     Require(ready(),"Timed out waiting for a scripted catalog step");
 }
 
+/// <summary>Queues work like a UI dispatcher whose thread is not the caller's.</summary>
+sealed class ManualDispatcher : IDispatcher {
+    private readonly Queue<Action> pending = new();
+    public bool HasAccess => false;
+    public void Post(Action work) => pending.Enqueue(work);
+    public void RunPending() { while(pending.Count>0)pending.Dequeue()(); }
+}
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();
     public Task<IReadOnlyList<VirCre.Launcher.PhoneDevice>> GetDevicesAsync(CancellationToken token) => throw new NotSupportedException();

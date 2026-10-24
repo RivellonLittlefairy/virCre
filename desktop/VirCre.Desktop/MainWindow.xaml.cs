@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window {
         appWindows=new(windowHost,observerFailure:error=>RuntimeDiagnostics.Write("window-observer-failed",error));
         var settings = LoadSettings();
         RuntimeDiagnostics.Write("startup",details:DataDirectory);
-        model = new(settings: settings.Settings);
+        model = new(settings: settings.Settings, dispatcher: new WindowDispatcher(DispatcherQueue));
         catalogController = new(phone, model);
         devices = new(phone, catalogController, model);
         InitializeComponent();

@@ -3,9 +3,9 @@ using VirCre.Launcher;
 namespace VirCre.Presentation;
 
 /// <summary>
-/// Owns device discovery, selection and the scan cancellation rules. Call it from the
-/// UI synchronization context: it publishes snapshots through <see cref="Changed"/> on
-/// that context, while the catalog performs its own I/O in the background.
+/// Owns device discovery, selection and the scan cancellation rules. Snapshots reach
+/// <see cref="Changed"/> through the model's dispatcher, so the catalog may perform its
+/// I/O on any thread; the host still chooses where the controller itself is driven from.
 /// </summary>
 public sealed class DeviceController(IPhoneCatalog phone, CatalogController catalog, ShellViewModel model) : IDisposable {
     private readonly List<Task> pending = [];
@@ -76,7 +76,7 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
             var found = await phone.GetDevicesAsync(request.Token);
             if (!IsCurrent(ticket, request)) return;
             var selected = RestoreSelection(found, previous);
-            Publish(new(found, selected, false));
+            PublishIfCurrent(ticket, request, new(found, selected, false));
             if (selected?.State != DeviceState.Online && previous != null) {
                 model.ReportDeviceError((selected?.State == DeviceState.Unauthorized
                     ? "请在手机上允许调试授权后刷新。" : "手机连接未确认，请检查连接后刷新。") + "仍显示上次列表，暂不能启动应用。", preserveCatalog: true);
@@ -85,12 +85,12 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
         } catch (Exception error) when (CatalogErrors.IsExpected(error)) {
             if (IsCurrent(ticket, request)) {
                 var message = "设备读取失败，仍显示上次列表，暂不能启动应用。" + error.Message;
-                Publish(new([], null, false, message));
+                PublishIfCurrent(ticket, request, new([], null, false, message));
                 model.ReportDeviceError(message, preserveCatalog: true);
             }
         } finally {
             if (ReferenceEquals(scan, request)) scan = null;
-            if (IsCurrent(ticket, request) && state.Scanning) Publish(state with { Scanning = false });
+            model.Dispatcher.Post(() => { if (IsCurrent(ticket, request) && state.Scanning) PublishNow(state with { Scanning = false }); });
         }
     }
 
@@ -105,7 +105,14 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
     private bool IsCurrent(int ticket, CancellationTokenSource request) =>
         !disposed && ticket == generation && !request.IsCancellationRequested;
 
-    private void Publish(DeviceSelectionState next) {
+    /// <summary>State changes reach <see cref="Changed"/> on the host's UI thread, never on a worker.</summary>
+    private void Publish(DeviceSelectionState next) => model.Dispatcher.Post(() => PublishNow(next));
+
+    /// <summary>Rechecks the ticket on the UI thread so a cancellation that landed while queued still wins.</summary>
+    private void PublishIfCurrent(int ticket, CancellationTokenSource request, DeviceSelectionState next) =>
+        model.Dispatcher.Post(() => { if (IsCurrent(ticket, request)) PublishNow(next); });
+
+    private void PublishNow(DeviceSelectionState next) {
         if (disposed) return;
         state = next;
         Changed?.Invoke();

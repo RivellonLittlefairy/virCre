@@ -13,7 +13,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     private readonly ObservableCollection<RunningWindowCard> runningCards = [];
     private readonly Dictionary<Guid,AppCard> windowArtwork = [];
     private PhoneDevice? currentDevice;
-    public ShellViewModel(bool preview = false, UserSettings? settings = null) {
+    public ShellViewModel(bool preview = false, UserSettings? settings = null, IDispatcher? dispatcher = null) {
+        Dispatcher = dispatcher ?? ImmediateDispatcher.Instance;
         IsPreview = preview;
         catalog = preview ? [.. DemoCatalog.Create()] : [];
         if (settings != null) {
@@ -24,25 +25,27 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? SettingsChanged;
+    /// <summary>Host-supplied UI thread; every state change is published through it.</summary>
+    public IDispatcher Dispatcher {get;}
     public string Theme {get;private set;} = "System";
     public bool VirtualCameraEnabled {get;private set;} = true;
     public int CameraFrameRate {get;private set;} = CameraFrameRates.Default;
     public UserSettings ExportSettings() => new(favorites.Order(StringComparer.Ordinal).ToArray(),Theme,
         VirtualCameraEnabled:VirtualCameraEnabled,CameraFrameRate:CameraFrameRate);
-    public void SetTheme(string theme) {
+    public void SetTheme(string theme) => Dispatcher.Post(() => {
         theme=theme is "Light" or "Dark"?theme:"System";
         if(Theme==theme)return;
         Theme=theme;Notify(nameof(Theme));SettingsChanged?.Invoke();
-    }
-    public void SetVirtualCameraEnabled(bool enabled) {
+    });
+    public void SetVirtualCameraEnabled(bool enabled) => Dispatcher.Post(() => {
         if(VirtualCameraEnabled==enabled)return;
         VirtualCameraEnabled=enabled;Notify(nameof(VirtualCameraEnabled));SettingsChanged?.Invoke();
-    }
-    public void SetCameraFrameRate(int frameRate) {
+    });
+    public void SetCameraFrameRate(int frameRate) => Dispatcher.Post(() => {
         frameRate=CameraFrameRates.Validate(frameRate);
         if(CameraFrameRate==frameRate)return;
         CameraFrameRate=frameRate;Notify(nameof(CameraFrameRate));SettingsChanged?.Invoke();
-    }
+    });
     public ReadOnlyObservableCollection<AppCard> Apps {get;}
     public ReadOnlyObservableCollection<AppWindowInfo> Running {get;}
     public ReadOnlyObservableCollection<RunningWindowCard> RunningCards {get;}
@@ -105,27 +108,27 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         Query.Length > 0 ? "清空搜索" : Page == "favorites" ? "查看全部应用" : "刷新设备与应用";
 
     /// <summary>Accepts the device controller snapshot; the model never reads the window.</summary>
-    public void UpdateDeviceSelection(DeviceSelectionState selection) {
+    public void UpdateDeviceSelection(DeviceSelectionState selection) => Dispatcher.Post(() => {
         if(DeviceSelection==selection)return;
         DeviceSelection=selection;Refresh();
-    }
+    });
     /// <summary>Window shutdown state, pushed explicitly by the view when it starts or re-enters cleanup.</summary>
-    public void SetShutdown(bool started,bool stopping) {
+    public void SetShutdown(bool started,bool stopping) => Dispatcher.Post(() => {
         if(IsCleanup==started && IsStopping==stopping)return;
         IsCleanup=started;IsStopping=stopping;Refresh();
-    }
+    });
 
-    public void Navigate(string page) {
+    public void Navigate(string page) => Dispatcher.Post(() => {
         if(page is not ("apps" or "favorites" or "running" or "settings"))return;
         Page=page;Query="";Refresh();
-    }
-    public void Search(string query) {Query=query;Refresh();}
-    public void ToggleFavorite(string packageName) {
+    });
+    public void Search(string query) => Dispatcher.Post(() => {Query=query;Refresh();});
+    public void ToggleFavorite(string packageName) => Dispatcher.Post(() => {
         var index=catalog.FindIndex(app=>app.PackageName==packageName);if(index<0)return;
         if(!favorites.Add(packageName))favorites.Remove(packageName);
         catalog[index]=catalog[index] with {IsFavorite=favorites.Contains(packageName)};Refresh();SettingsChanged?.Invoke();
-    }
-    internal void BeginLoad(PhoneDevice? device) {
+    });
+    internal void BeginLoad(PhoneDevice? device) => Dispatcher.Post(() => {
         currentDevice=device;
         IsPreview=false;catalog.Clear();Query="";
         DeviceLabel=device?.Model??"未选择设备";
@@ -137,23 +140,23 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
             DeviceState.Offline=>"设备已离线，请检查连接后刷新设备。", _=>""
         };
         Refresh();
-    }
-    internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) {
+    });
+    internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) => Dispatcher.Post(() => {
         catalog.Clear();
         foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial,app.IconPath));
         IsLoading=false;ErrorMessage="";Refresh();
-    }
-    internal void FailLoad(string error) {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();}
-    public void ReportDeviceError(string error, bool preserveCatalog = false) {
+    });
+    internal void FailLoad(string error) => Dispatcher.Post(() => {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();});
+    public void ReportDeviceError(string error, bool preserveCatalog = false) => Dispatcher.Post(() => {
         if (preserveCatalog && catalog.Count > 0) {
             HasDevice=false;IsLoading=false;ErrorMessage=error;
             Refresh();
         } else {BeginLoad(null);FailLoad(error);}
-    }
-    public void UpdateWindows(IReadOnlyList<AppWindowInfo> windows) {
+    });
+    public void UpdateWindows(IReadOnlyList<AppWindowInfo> windows) => Dispatcher.Post(() => {
         running.Clear();foreach(var window in windows)running.Add(window);
         Refresh();
-    }
+    });
     private static string AppColor(string packageName) {
         string[] colors=["#507C93","#8576A6","#548D8A","#A86F73","#B58A4C","#697E99","#768B6F"];
         uint hash=2166136261;foreach(var ch in packageName)hash=unchecked((hash^ch)*16777619);
