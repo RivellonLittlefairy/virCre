@@ -168,6 +168,34 @@ using (var loadingController = new CatalogController(loadingSource, loadingModel
 }
 Console.WriteLine("PASS: card actions require the live device, catalog, and idle launcher");
 
+var noPhone = CameraCompatibilityState.Create(null,true,false,false);
+Require(noPhone.ToggleChecked && noPhone.ToggleEnabled && noPhone.FrameRateEnabled && noPhone.Description.Contains("Android 10"),
+    "No selected phone must leave the saved camera preference editable");
+var unknownVersion = CameraCompatibilityState.Create(DeviceWithApi(null),true,false,false);
+Require(unknownVersion.ToggleChecked && unknownVersion.ToggleEnabled && unknownVersion.FrameRateEnabled && unknownVersion.Description.Contains("未能确认"),
+    "An unknown Android version must stay configurable while telling the user to refresh");
+var android9 = CameraCompatibilityState.Create(DeviceWithApi(28),true,false,false);
+Require(!android9.ToggleChecked && !android9.ToggleEnabled && !android9.FrameRateEnabled && android9.Description.Contains("不支持独立应用窗口"),
+    "Android without multi-display support must disable app windows");
+var android10 = CameraCompatibilityState.Create(DeviceWithApi(29),true,false,false);
+Require(!android10.ToggleChecked && !android10.ToggleEnabled && !android10.FrameRateEnabled && android10.Description.Contains("已自动禁用虚拟摄像头"),
+    "Android 10 keeps app windows but disables the virtual camera");
+var android15 = CameraCompatibilityState.Create(DeviceWithApi(35),true,false,false);
+Require(!android15.ToggleChecked && !android15.ToggleEnabled && !android15.FrameRateEnabled && android15.Description.Contains("已自动禁用虚拟摄像头"),
+    "Android 15 still cannot provide the virtual camera");
+var android15WithCamera = CameraCompatibilityState.Create(DeviceWithApi(35),true,true,false);
+Require(!android15WithCamera.ToggleChecked && !android15WithCamera.ToggleEnabled && android15WithCamera.FrameRateEnabled,
+    "An existing camera window on another phone must keep its frame rate adjustable");
+var android16 = CameraCompatibilityState.Create(DeviceWithApi(36),true,false,false);
+Require(android16.ToggleChecked && android16.ToggleEnabled && android16.FrameRateEnabled && android16.Description.Contains("支持虚拟摄像头"),
+    "Android 16 must enable the virtual camera controls");
+var disabledPreference = CameraCompatibilityState.Create(DeviceWithApi(36),false,false,false);
+Require(!disabledPreference.ToggleChecked && disabledPreference.ToggleEnabled,"A saved off switch must stay off on a supported phone");
+var stoppingState = CameraCompatibilityState.Create(DeviceWithApi(36),true,true,true);
+Require(stoppingState.ToggleChecked && !stoppingState.ToggleEnabled && !stoppingState.FrameRateEnabled,
+    "Shutdown must disable camera controls without rewriting the saved preference");
+Console.WriteLine("PASS: camera compatibility reflects the phone without overwriting saved preferences");
+
 var shutdownModel = new ShellViewModel();
 var shutdownSource = new ControlledCatalog();
 var shutdownController = new CatalogController(shutdownSource, shutdownModel);
@@ -188,6 +216,8 @@ Require(windowsModel.IsEmpty,"Closing last window must restore running empty sta
 Console.WriteLine("PASS: running windows remain independent of selected device and update empty state");
 await ShutdownChecks.RunAsync();
 static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
+static VirCre.Launcher.PhoneDevice DeviceWithApi(int? api) =>
+    new("phone.camera","Camera",VirCre.Launcher.DeviceState.Online,ApiLevel:api);
 
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();
