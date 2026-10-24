@@ -125,6 +125,53 @@ try {
     Check(rejectedAfterStop,"a stopped queue rejects new snapshots and its second stop is harmless");
     Console.WriteLine("PASS: settings save queue serializes, isolates failures and drains on shutdown");
 
+    var shortcutHost=new ShortcutHost();
+    var shortcutWindows=new AppWindowManager(shortcutHost);
+    var shortcutLaunchService=new AppLaunchService(shortcutWindows);
+    var presentLauncher=new ShortcutLauncher(
+        new DeviceCatalog([new PhoneDevice("10.0.0.9:5555","Vivo",DeviceState.Online,"hw-vivo",36)]),
+        new GetPropRunner(),shortcutLaunchService,(serial,packageName,token)=>Task.FromResult(packageName=="com.present"));
+    var shortcutPayload=new ShortcutRequest("192.168.1.2:5555","hw-vivo","Vivo","com.present","Present").Encode();
+    var shortcutOpen=presentLauncher.OpenAsync(shortcutPayload,new([],CameraFrameRate:20),default);
+    shortcutHost.Processes[0].Ready.SetResult();
+    var shortcutResult=await shortcutOpen;
+    Check(shortcutResult.Window.Request.Serial=="10.0.0.9:5555" && shortcutResult.Window.Request.CameraFrameRate==20,
+        "a shortcut follows the hardware identity and applies the settings snapshot");
+    await shortcutWindows.StopAsync();
+
+    var reusedHost=new ShortcutHost();
+    var reusedWindows=new AppWindowManager(reusedHost);
+    var reusedLauncher=new ShortcutLauncher(
+        new DeviceCatalog([new("192.168.1.2:5555","Old phone",DeviceState.Online,"hw-old",36),
+            new("10.0.0.9:5555","Vivo",DeviceState.Online,"hw-vivo",36)]),
+        new GetPropRunner(),new AppLaunchService(reusedWindows),(_,_,_)=>Task.FromResult(true));
+    var reusedOpen=reusedLauncher.OpenAsync(shortcutPayload,new([]),default);
+    reusedHost.Processes[0].Ready.SetResult();
+    var reusedResult=await reusedOpen;
+    Check(reusedResult.Window.Request.Serial=="10.0.0.9:5555","a reused network address never wins over the hardware identity");
+    await reusedWindows.StopAsync();
+
+    var lockedHost=new ShortcutHost();
+    var lockedWindows=new AppWindowManager(lockedHost);
+    var lockedLauncher=new ShortcutLauncher(
+        new DeviceCatalog([new("10.0.0.9:5555","Vivo",DeviceState.Unauthorized,"hw-vivo",36)]),
+        new GetPropRunner(),new AppLaunchService(lockedWindows),(_,_,_)=>Task.FromResult(true));
+    var lockedRejected=false;
+    try {await lockedLauncher.OpenAsync(shortcutPayload,new([]),default);}catch(IOException) {lockedRejected=true;}
+    Check(lockedRejected && lockedHost.Processes.Count==0,"an unauthorized phone is never launched from a shortcut");
+    await lockedWindows.StopAsync();
+
+    var missingHost=new ShortcutHost();
+    var missingWindows=new AppWindowManager(missingHost);
+    var missingLauncher=new ShortcutLauncher(
+        new DeviceCatalog([new("10.0.0.9:5555","Vivo",DeviceState.Online,"hw-vivo",36)]),
+        new GetPropRunner(),new AppLaunchService(missingWindows),(_,_,_)=>Task.FromResult(false));
+    var missingRejected=false;
+    try {await missingLauncher.OpenAsync(shortcutPayload,new([]),default);}catch(IOException) {missingRejected=true;}
+    Check(missingRejected && missingHost.Processes.Count==0,"a shortcut whose app was uninstalled is rejected before starting");
+    await missingWindows.StopAsync();
+    Console.WriteLine("PASS: shortcut launches run without the shell window and re-check the phone");
+
     if (args.Length is 3 or 5 && args[0] == "--device") {
         var liveCache=args.Length==5 && args[3]=="--cache-root"?Path.GetFullPath(args[4]):Path.Combine(root,"icons");
         var liveTools=new BundledTools(Path.GetFullPath("out/desktop-release"));
@@ -156,4 +203,28 @@ sealed class IconRunner(string output,CancellationTokenSource? cancellation=null
 sealed class IdentityCatalogRunner : ICommandRunner {
     public Task<CommandResult> RunAsync(string file,IReadOnlyList<string> arguments,TimeSpan timeout,CancellationToken token)=>Task.FromResult(arguments.Contains("getprop")?
         new CommandResult(0,"verified-phone-id\n",""):new CommandResult(0,"List of devices attached\nphone.one device model:Phone\n",""));
+}
+sealed class DeviceCatalog(IReadOnlyList<PhoneDevice> devices) : IPhoneCatalog {
+    public Task<IReadOnlyList<PhoneDevice>> GetDevicesAsync(CancellationToken token)=>Task.FromResult(devices);
+    public Task<IReadOnlyList<PhoneApp>> GetAppsAsync(string serial,CancellationToken token)=>throw new NotSupportedException();
+}
+sealed class GetPropRunner : ICommandRunner {
+    public Task<CommandResult> RunAsync(string file,IReadOnlyList<string> arguments,TimeSpan timeout,CancellationToken token)=>
+        Task.FromResult(new CommandResult(0,"other-hardware\n",""));
+}
+sealed class ShortcutHost : IAppWindowHost {
+    public List<ShortcutProcess> Processes {get;}=[];
+    public IAppWindowProcess Start(AppLaunchRequest request){var process=new ShortcutProcess();Processes.Add(process);return process;}
+}
+sealed class ShortcutProcess : IAppWindowProcess {
+    private readonly TaskCompletionSource exited=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource Ready {get;}=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public bool HasExited=>exited.Task.IsCompleted;
+    public int? DisplayId=>null;
+    public int ExitCode=>0;
+    public Task WaitForReadyAsync(CancellationToken token)=>Ready.Task.WaitAsync(token);
+    public Task WaitForExitAsync()=>exited.Task;
+    public bool Focus()=>true;
+    public Task CloseAsync(){exited.TrySetResult();return Task.CompletedTask;}
+    public void Dispose(){}
 }

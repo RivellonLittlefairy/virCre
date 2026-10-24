@@ -17,7 +17,7 @@ public sealed partial class MainWindow {
         }
         if(payload==null) {ShowLauncher();return;}
         pendingShortcutActivations++;
-        shortcutTask=OpenShortcutAfterAsync(shortcutTask,payload);
+        shortcutTask=OpenShortcutAfterAsync(shortcutTask,payload,model.ExportSettings());
     }
     private void ShowLauncher() {
         shortcutOnly=false;
@@ -28,20 +28,21 @@ public sealed partial class MainWindow {
         RuntimeDiagnostics.Write("shortcut-session-ended");
         Close();
     }
-    private async Task OpenShortcutAfterAsync(Task previous, string payload) {
+    private ShortcutLauncher? shortcutLauncher;
+    private ShortcutLauncher GetShortcutLauncher() {
+        if(shortcutLauncher!=null)return shortcutLauncher;
+        var runner=new CommandRunner();
+        var directory=new PhoneCatalog(runner);
+        return shortcutLauncher=new(directory,runner,AppLaunches,(serial,packageName,token)=>directory.CanLaunchAsync(serial,packageName,token));
+    }
+    private async Task OpenShortcutAfterAsync(Task previous, string payload, UserSettings settings) {
         try {
             await previous;
             if(closing || windowShutdown.HasStarted) return;
             var request=ShortcutRequest.Decode(payload);
             RuntimeDiagnostics.Write("shortcut-launch",details:shortcutOnly?"background":"launcher");
             ShowAction($"正在连接 {request.DeviceName}，打开 {request.Name}…");
-            var runner=new CommandRunner();
-            var directory=new PhoneCatalog(runner);
-            var devices=await directory.GetDevicesAsync(lifetime.Token);
-            var device=await request.ResolveAsync(devices,(s,t)=>ShortcutRequest.GetHardwareIdAsync(runner,s,t),lifetime.Token);
-            if(!await directory.CanLaunchAsync(device.Serial,request.PackageName,lifetime.Token))
-                throw new IOException("手机中已找不到此应用的启动入口，请刷新列表并重新创建快捷方式。");
-            var result=await AppLaunches.OpenAsync(device,request.PackageName,request.Name,model.VirtualCameraEnabled,model.CameraFrameRate,lifetime.Token);
+            var result=await GetShortcutLauncher().OpenAsync(payload,settings,lifetime.Token);
             RuntimeDiagnostics.Write("shortcut-opened",details:result.Reused?"existing-window":"new-window");
             ShowAction(result.Activated?$"已打开 {request.Name}。":$"{request.Name} 窗口已存在，请从任务栏切回。");
         } catch(OperationCanceledException) { }
