@@ -172,8 +172,11 @@ var noPhone = CameraCompatibilityState.Create(null,true,false,false);
 Require(noPhone.ToggleChecked && noPhone.ToggleEnabled && noPhone.FrameRateEnabled && noPhone.Description.Contains("Android 10"),
     "No selected phone must leave the saved camera preference editable");
 var unknownVersion = CameraCompatibilityState.Create(DeviceWithApi(null),true,false,false);
-Require(unknownVersion.ToggleChecked && unknownVersion.ToggleEnabled && unknownVersion.FrameRateEnabled && unknownVersion.Description.Contains("未能确认"),
-    "An unknown Android version must stay configurable while telling the user to refresh");
+Require(!unknownVersion.ToggleChecked && !unknownVersion.ToggleEnabled && !unknownVersion.FrameRateEnabled && unknownVersion.Description.Contains("未能确认"),
+    "An online phone with an unknown Android version must disable camera controls and ask the user to refresh");
+var unknownVersionWithCamera = CameraCompatibilityState.Create(DeviceWithApi(null),true,true,false);
+Require(!unknownVersionWithCamera.ToggleChecked && !unknownVersionWithCamera.ToggleEnabled && unknownVersionWithCamera.FrameRateEnabled && unknownVersionWithCamera.Description.Contains("未能确认"),
+    "An existing camera window must keep its frame rate adjustable when the selected phone's Android version is unknown");
 var android9 = CameraCompatibilityState.Create(DeviceWithApi(28),true,false,false);
 Require(!android9.ToggleChecked && !android9.ToggleEnabled && !android9.FrameRateEnabled && android9.Description.Contains("不支持独立应用窗口"),
     "Android without multi-display support must disable app windows");
