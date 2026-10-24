@@ -36,21 +36,21 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <Border Width="32" Height="37" Background="{ThemeResource ShellSoft}" CornerRadius="8" VerticalAlignment="Center"><FontIcon Glyph="&#xE8EA;" FontSize="18" Foreground="{ThemeResource ShellMuted}" /></Border>
                         <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
-                            <ComboBox x:Name="DevicePicker" PlaceholderText="选择手机" MinWidth="0" MaxWidth="240" HorizontalAlignment="Left" Background="Transparent" BorderThickness="0" Padding="0,2,22,2" MinHeight="26" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource ShellInk}" SelectionChanged="DevicePicker_SelectionChanged" AutomationProperties.Name="选择手机">
+                            <ComboBox x:Name="DevicePicker" IsEnabled="{x:Bind Model.IsDevicePickerEnabled, Mode=OneWay}" PlaceholderText="选择手机" MinWidth="0" MaxWidth="240" HorizontalAlignment="Left" Background="Transparent" BorderThickness="0" Padding="0,2,22,2" MinHeight="26" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource ShellInk}" SelectionChanged="DevicePicker_SelectionChanged" AutomationProperties.Name="选择手机">
                                 <ComboBox.ItemTemplate><DataTemplate x:DataType="launcher:PhoneDevice"><TextBlock Text="{x:Bind Model}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Serial}" /></DataTemplate></ComboBox.ItemTemplate>
                             </ComboBox>
-                            <TextBlock x:Name="DeviceHint" Text="连接后选择设备" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="DeviceHint" Text="{x:Bind Model.DeviceHint, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel x:Name="ConnectionIndicator" Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0"><Ellipse x:Name="ConnectionDot" Width="6" Height="6" Fill="{ThemeResource ShellMuted}" VerticalAlignment="Center" /><TextBlock x:Name="ConnectionStatus" Text="未连接" FontSize="11" Foreground="{ThemeResource ShellMuted}" /></StackPanel>
-                        <Button x:Name="RefreshDevices" Grid.Column="3" Style="{StaticResource ShellQuietButton}" Click="RefreshDevices_Click" VerticalAlignment="Center" AutomationProperties.Name="刷新设备与应用" ToolTipService.ToolTip="重新读取设备与应用；平时启动使用缓存"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72C;" FontSize="15" /><TextBlock x:Name="RefreshLabel" Text="刷新设备与应用" FontSize="12" /></StackPanel></Button>
+                        <StackPanel x:Name="ConnectionIndicator" Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0"><Ellipse x:Name="ConnectionDot" Width="6" Height="6" Fill="{ThemeResource ShellMuted}" VerticalAlignment="Center" /><TextBlock x:Name="ConnectionStatus" Text="{x:Bind Model.ConnectionStatus, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource ShellMuted}" /></StackPanel>
+                        <Button x:Name="RefreshDevices" Grid.Column="3" IsEnabled="{x:Bind Model.IsRefreshEnabled, Mode=OneWay}" Style="{StaticResource ShellQuietButton}" Click="RefreshDevices_Click" VerticalAlignment="Center" AutomationProperties.Name="刷新设备与应用" ToolTipService.ToolTip="重新读取设备与应用；平时启动使用缓存"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72C;" FontSize="15" /><TextBlock x:Name="RefreshLabel" Text="刷新设备与应用" FontSize="12" /></StackPanel></Button>
                     </Grid>
                 </Border>
                 <Grid x:Name="ContentArea" Grid.Row="1" Padding="28,24,28,0" Background="{ThemeResource ShellField}" SizeChanged="ContentArea_SizeChanged">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                    <TextBlock x:Name="PageTitle" Text="{x:Bind Model.Title, Mode=OneWay}" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" Visibility="Collapsed" AutomationProperties.HeadingLevel="Level1" Margin="0,0,0,16" />
-                    <Grid x:Name="SearchRow" Grid.Row="1" ColumnSpacing="12" Margin="0,0,0,16">
+                    <TextBlock x:Name="PageTitle" Text="{x:Bind Model.Title, Mode=OneWay}" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" Visibility="{x:Bind ViewVisibility(Model.ShowPageTitle), Mode=OneWay}" AutomationProperties.HeadingLevel="Level1" Margin="0,0,0,16" />
+                    <Grid x:Name="SearchRow" Grid.Row="1" ColumnSpacing="12" Margin="0,0,0,16" Visibility="{x:Bind ViewVisibility(Model.ShowSearchRow), Mode=OneWay}">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <AutoSuggestBox x:Name="SearchBox" PlaceholderText="搜索应用名称或包名" QueryIcon="Find" TextChanged="Search_TextChanged" Background="{ThemeResource ShellPaper}" CornerRadius="7" FontSize="12" MinHeight="36" VerticalContentAlignment="Center" AutomationProperties.Name="搜索应用名称或包名" HorizontalAlignment="Left" MaxWidth="345" Width="345" BorderThickness="1" BorderBrush="{ThemeResource ShellLine}">
+                        <AutoSuggestBox x:Name="SearchBox" IsEnabled="{x:Bind Model.IsSearchEnabled, Mode=OneWay}" PlaceholderText="搜索应用名称或包名" QueryIcon="Find" TextChanged="Search_TextChanged" Background="{ThemeResource ShellPaper}" CornerRadius="7" FontSize="12" MinHeight="36" VerticalContentAlignment="Center" AutomationProperties.Name="搜索应用名称或包名" HorizontalAlignment="Left" MaxWidth="345" Width="345" BorderThickness="1" BorderBrush="{ThemeResource ShellLine}">
                             <AutoSuggestBox.Resources>
                                 <ResourceDictionary>
                                     <ResourceDictionary.ThemeDictionaries>
@@ -75,11 +75,11 @@
                                 </ResourceDictionary>
                             </AutoSuggestBox.Resources>
                         </AutoSuggestBox>
-                        <ProgressRing x:Name="LoadingRing" Grid.Column="1" Width="18" Height="18" IsActive="False" AutomationProperties.Name="正在读取" />
+                        <ProgressRing x:Name="LoadingRing" Grid.Column="1" Width="18" Height="18" IsActive="{x:Bind Model.IsBusy, Mode=OneWay}" AutomationProperties.Name="正在读取" />
                         <TextBlock x:Name="AppCount" Grid.Column="2" Text="{x:Bind Model.ResultCount, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource ShellMuted}" VerticalAlignment="Center" />
                     </Grid>
                     <Grid Grid.Row="2">
-                        <GridView x:Name="AppGrid" SelectionMode="None" IsItemClickEnabled="False" Padding="0,0,0,20" Margin="-5,0,-5,0" SizeChanged="AppGrid_SizeChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="应用列表">
+                        <GridView x:Name="AppGrid" IsEnabled="{x:Bind Model.IsAppGridEnabled, Mode=OneWay}" Visibility="{x:Bind ViewVisibility(Model.ShowAppGrid), Mode=OneWay}" SelectionMode="None" IsItemClickEnabled="False" Padding="0,0,0,20" Margin="-5,0,-5,0" SizeChanged="AppGrid_SizeChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="应用列表">
                             <GridView.ItemsPanel><ItemsPanelTemplate><ItemsWrapGrid Orientation="Horizontal" ItemWidth="230" ItemHeight="82" /></ItemsPanelTemplate></GridView.ItemsPanel>
                             <GridView.ItemContainerStyle><StaticResource ResourceKey="AppCardContainer" /></GridView.ItemContainerStyle>
                             <GridView.ItemContainerTransitions><TransitionCollection /></GridView.ItemContainerTransitions>
@@ -103,7 +103,7 @@
                                 </Border>
                             </DataTemplate></GridView.ItemTemplate>
                         </GridView>
-                        <ListView x:Name="RunningList" Visibility="Collapsed" SelectionMode="None" Padding="0,0,0,20" AutomationProperties.Name="运行中的窗口">
+                        <ListView x:Name="RunningList" Visibility="{x:Bind ViewVisibility(Model.ShowRunningList), Mode=OneWay}" SelectionMode="None" Padding="0,0,0,20" AutomationProperties.Name="运行中的窗口">
                             <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,10" /></Style></ListView.ItemContainerStyle>
                             <ListView.ItemTemplate><DataTemplate x:DataType="presentation:RunningWindowCard">
                                 <Border Background="{ThemeResource ShellPaper}" BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" CornerRadius="8" Padding="14,16">
@@ -119,21 +119,21 @@
                                 </Border>
                             </DataTemplate></ListView.ItemTemplate>
                         </ListView>
-                        <ScrollViewer x:Name="EmptyState" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="EmptyState" Visibility="{x:Bind ViewVisibility(Model.ShowEmptyState), Mode=OneWay}" VerticalScrollBarVisibility="Auto">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="390" Margin="12,40">
-                                <Border Width="68" Height="68" Background="{ThemeResource ShellSoft}" CornerRadius="18" HorizontalAlignment="Center"><FontIcon x:Name="EmptyIcon" Glyph="&#xE8EA;" FontSize="29" Foreground="{ThemeResource ShellAccent}" /></Border>
-                                <TextBlock x:Name="EmptyTitle" FontSize="21" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                <TextBlock x:Name="EmptyDescription" Style="{StaticResource ShellHint}" TextAlignment="Center" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="EmptySteps" Text="1  连接手机    2  开启调试并授权    3  刷新设备" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed" />
-                                <Button x:Name="EmptyAction" Content="刷新设备" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Center" Click="EmptyAction_Click" />
+                                <Border Width="68" Height="68" Background="{ThemeResource ShellSoft}" CornerRadius="18" HorizontalAlignment="Center"><FontIcon x:Name="EmptyIcon" Glyph="{x:Bind Model.EmptyGlyph, Mode=OneWay}" FontSize="29" Foreground="{ThemeResource ShellAccent}" /></Border>
+                                <TextBlock x:Name="EmptyTitle" Text="{x:Bind Model.EmptyTitle, Mode=OneWay}" FontSize="21" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock x:Name="EmptyDescription" Text="{x:Bind Model.EmptyDescription, Mode=OneWay}" Style="{StaticResource ShellHint}" TextAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="EmptySteps" Visibility="{x:Bind ViewVisibility(Model.ShowEmptySteps), Mode=OneWay}" Text="1  连接手机    2  开启调试并授权    3  刷新设备" FontSize="11" Foreground="{ThemeResource ShellMuted}" TextAlignment="Center" TextWrapping="Wrap" />
+                                <Button x:Name="EmptyAction" Content="{x:Bind Model.EmptyActionText, Mode=OneWay}" IsEnabled="{x:Bind Model.IsEmptyActionEnabled, Mode=OneWay}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Center" Click="EmptyAction_Click" />
                             </StackPanel>
                         </ScrollViewer>
-                        <ScrollViewer x:Name="SettingsContent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer x:Name="SettingsContent" Visibility="{x:Bind ViewVisibility(Model.ShowSettings), Mode=OneWay}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Padding="0,0,0,20">
                                 <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" Padding="0,8,0,22">
                                     <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <StackPanel Spacing="5"><TextBlock Text="外观" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource ShellInk}" /><TextBlock Text="选择适合你的界面主题。" Style="{StaticResource ShellHint}" /></StackPanel>
-                                        <ComboBox x:Name="ThemeChoice" Grid.Column="1" SelectedIndex="0" SelectionChanged="Theme_SelectionChanged" VerticalAlignment="Center" AutomationProperties.Name="界面主题"><x:String>跟随系统</x:String><x:String>浅色</x:String><x:String>深色</x:String></ComboBox>
+                                        <ComboBox x:Name="ThemeChoice" Grid.Column="1" IsEnabled="{x:Bind Model.IsSettingsEnabled, Mode=OneWay}" SelectedIndex="0" SelectionChanged="Theme_SelectionChanged" VerticalAlignment="Center" AutomationProperties.Name="界面主题"><x:String>跟随系统</x:String><x:String>浅色</x:String><x:String>深色</x:String></ComboBox>
                                     </Grid>
                                 </Border>
                                 <Border BorderBrush="{ThemeResource ShellLine}" BorderThickness="0,0,0,1" Padding="0,22">

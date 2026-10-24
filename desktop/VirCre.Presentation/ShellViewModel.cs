@@ -50,6 +50,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public bool IsPreview {get;private set;}
     public bool HasDevice {get;private set;}
     public bool IsLoading {get;private set;}
+    /// <summary>Window shutdown has started and will not accept new work again.</summary>
+    public bool IsCleanup {get;private set;}
+    /// <summary>Shutdown is waiting for background work right now.</summary>
+    public bool IsStopping {get;private set;}
+    public DeviceSelectionState DeviceSelection {get;private set;} = new([], null, false);
     public string DeviceLabel {get;private set;} = "未选择设备";
     public string ErrorMessage {get;private set;} = "";
     public string Query {get;private set;} = "";
@@ -60,6 +65,24 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public int FavoriteCount => catalog.Count(app => app.IsFavorite);
     public int RunningCount => running.Count;
     public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
+    public string ConnectionStatus => IsCleanup ? "等待退出" : DeviceStatus;
+    public bool IsConnectedStatus => !IsCleanup && HasDevice && ErrorMessage.Length == 0;
+    public string DeviceHint => IsCleanup ? "正在结束会话" : DeviceSelection.Scanning ? "正在检查设备…" :
+        DeviceSelection.Selected is {State:DeviceState.Online} device ? $"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}" : "连接后选择设备";
+    public bool IsBusy => IsCleanup ? IsStopping : DeviceSelection.Scanning || IsLoading;
+    public bool IsSearchEnabled => !IsCleanup && !IsLoading && HasDevice;
+    public bool IsDevicePickerEnabled => !IsCleanup && !DeviceSelection.Scanning;
+    public bool IsRefreshEnabled => IsDevicePickerEnabled;
+    public bool IsAppGridEnabled => !IsCleanup && !DeviceSelection.Scanning && !IsLoading && HasDevice;
+    public bool IsSettingsEnabled => !IsCleanup;
+    public bool IsEmptyActionEnabled => !IsCleanup && !DeviceSelection.Scanning && !IsLoading;
+    public bool ShowPageTitle => Page is "settings" or "running";
+    public bool ShowSettings => Page == "settings";
+    public bool ShowSearchRow => !ShowPageTitle && (HasDevice || CatalogCount > 0);
+    public bool ShowAppGrid => Page is not ("settings" or "running") && !IsEmpty;
+    public bool ShowRunningList => Page == "running" && !IsEmpty;
+    public bool ShowEmptyState => Page != "settings" && IsEmpty;
+    public bool ShowEmptySteps => !HasDevice && Page is ("apps" or "favorites");
     public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
         IsLoading ? $"正在从 {DeviceLabel} 读取应用列表…" : ErrorMessage.Length > 0 ? ErrorMessage :
         HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 安装、卸载或更新应用后，请点击刷新" : "连接手机后，读取可启动的应用列表。";
@@ -70,13 +93,27 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         "settings" => "让桌面工具更合你的习惯。",
         _ => HasDevice ? $"来自 {DeviceLabel} 的手机应用。" : "手机上的应用，在桌面从容使用。"
     };
-    public string EmptyTitle => Page == "running" ? "还没有打开的应用" : IsLoading ? "正在读取手机应用" :
+    public string EmptyTitle => DeviceSelection.Scanning ? "正在查找手机" : Page == "running" ? "还没有打开的应用" : IsLoading ? "正在读取手机应用" :
         ErrorMessage.Length > 0 ? "暂时无法读取应用" : !HasDevice && !IsPreview ? "连接你的手机" :
         Query.Trim().Length > 0 ? "没有找到匹配的应用" : Page == "favorites" ? "把常用应用放在这里" : "没有可启动的应用";
-    public string EmptyDescription => Page == "running" ? "点击应用卡片打开后，即可在这里管理独立窗口。" :
+    public string EmptyDescription => DeviceSelection.Scanning ? "正在检查已授权的 ADB 设备。" : Page == "running" ? "点击应用卡片打开后，即可在这里管理独立窗口。" :
         IsLoading ? "首次读取可能需要一些时间，请保持手机连接。" : ErrorMessage.Length > 0 ? ErrorMessage :
         !HasDevice && !IsPreview ? "连接并授权后，手机里的应用就会出现在这里。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
         Page == "favorites" ? "点击应用卡片右侧的星标，收藏将在重启后保留。" : "点击刷新，重新读取手机上的应用。";
+    public string EmptyGlyph => Page == "running" ? "" : !HasDevice ? "" : Page == "favorites" ? "" : "";
+    public string EmptyActionText => Page == "running" ? "查看全部应用" : !HasDevice || ErrorMessage.Length > 0 ? "刷新设备" :
+        Query.Length > 0 ? "清空搜索" : Page == "favorites" ? "查看全部应用" : "刷新设备与应用";
+
+    /// <summary>Accepts the device controller snapshot; the model never reads the window.</summary>
+    public void UpdateDeviceSelection(DeviceSelectionState selection) {
+        if(DeviceSelection==selection)return;
+        DeviceSelection=selection;Refresh();
+    }
+    /// <summary>Window shutdown state, pushed explicitly by the view when it starts or re-enters cleanup.</summary>
+    public void SetShutdown(bool started,bool stopping) {
+        if(IsCleanup==started && IsStopping==stopping)return;
+        IsCleanup=started;IsStopping=stopping;Refresh();
+    }
 
     public void Navigate(string page) {
         if(page is not ("apps" or "favorites" or "running" or "settings"))return;
@@ -155,7 +192,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     private void Notify(string property) => PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(property));
     private void NotifyState() {
         foreach(var property in new[]{nameof(Page),nameof(Query),nameof(Title),nameof(Description),nameof(IsEmpty),nameof(ResultCount),nameof(EmptyTitle),nameof(EmptyDescription),
-            nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ErrorMessage),nameof(FooterText),nameof(CatalogCount),nameof(FavoriteCount),nameof(RunningCount)})
+            nameof(EmptyGlyph),nameof(EmptyActionText),
+            nameof(IsPreview),nameof(HasDevice),nameof(IsLoading),nameof(IsCleanup),nameof(IsStopping),nameof(DeviceSelection),nameof(DeviceLabel),nameof(DeviceStatus),nameof(ConnectionStatus),nameof(IsConnectedStatus),nameof(DeviceHint),
+            nameof(ErrorMessage),nameof(FooterText),nameof(CatalogCount),nameof(FavoriteCount),nameof(RunningCount),
+            nameof(IsBusy),nameof(IsSearchEnabled),nameof(IsDevicePickerEnabled),nameof(IsRefreshEnabled),nameof(IsAppGridEnabled),nameof(IsSettingsEnabled),nameof(IsEmptyActionEnabled),
+            nameof(ShowPageTitle),nameof(ShowSettings),nameof(ShowSearchRow),nameof(ShowAppGrid),nameof(ShowRunningList),nameof(ShowEmptyState),nameof(ShowEmptySteps)})
             PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(property));
     }
 }

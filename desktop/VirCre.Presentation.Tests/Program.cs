@@ -317,6 +317,61 @@ using (var stopDevices = new DeviceController(stopSource, stopCatalog, stopModel
         "A device scan published after shutdown");
 }
 Console.WriteLine("PASS: shutdown waits for every in-flight device scan and rejects late results");
+
+var viewState = new ShellViewModel();
+Require(viewState.ShowEmptyState && !viewState.ShowAppGrid && !viewState.ShowSearchRow && !viewState.ShowPageTitle && !viewState.IsSearchEnabled,
+    "An empty start must show only the empty state");
+Require(viewState.IsBusy == false && viewState.EmptyActionText == "刷新设备" && viewState.DeviceHint == "连接后选择设备",
+    "An empty start must offer a refresh and explain the device hint");
+var viewDevice = Device("p.view", "Phone", "hw-view");
+viewState.UpdateDeviceSelection(new([viewDevice], viewDevice, true));
+Require(viewState.IsBusy && !viewState.IsDevicePickerEnabled && !viewState.IsRefreshEnabled && !viewState.IsEmptyActionEnabled,
+    "Scanning must disable the picker, refresh and the empty action");
+Require(viewState.DeviceHint.Contains("正在检查设备") && viewState.EmptyTitle == "正在查找手机" && viewState.EmptyDescription.Contains("ADB"),
+    "Scanning must win over the normal empty state text");
+var viewSource = new ScriptedPhoneCatalog();
+using (var viewCatalog = new CatalogController(viewSource, viewState)) {
+    viewState.UpdateDeviceSelection(new([viewDevice], viewDevice, false));
+    var viewLoad = viewCatalog.SelectAsync(viewDevice, CancellationToken.None);
+    Require(viewState.IsBusy && !viewState.IsSearchEnabled && !viewState.IsAppGridEnabled && viewState.EmptyTitle == "正在读取手机应用",
+        "Loading must disable search and the grid while keeping the loading empty state");
+    viewSource.LastApps("p.view").SetResult([new("View app", "com.view.app", false)]);
+    await viewLoad;
+    Require(viewState.IsSearchEnabled && viewState.IsAppGridEnabled && viewState.ShowAppGrid && !viewState.ShowEmptyState && viewState.ShowSearchRow,
+        "A loaded phone must show the grid and enable search");
+    Require(viewState.EmptyActionText == "刷新设备与应用", "An app page without a query must offer a refresh");
+    var failedView = viewCatalog.SelectAsync(viewDevice, CancellationToken.None);
+    viewSource.LastApps("p.view").SetException(new IOException("读取失败"));
+    await failedView;
+    Require(viewState.ShowEmptyState && !viewState.ShowAppGrid && viewState.EmptyTitle == "暂时无法读取应用" && viewState.EmptyActionText == "刷新设备" && !viewState.IsConnectedStatus,
+        "A failed read must show the error empty state and offer a device refresh");
+    viewState.Navigate("running");
+    Require(viewState.ShowPageTitle && !viewState.ShowSearchRow && !viewState.ShowAppGrid && viewState.ShowEmptyState && viewState.EmptyActionText == "查看全部应用",
+        "An empty running page must show its own empty state");
+    viewState.Navigate("settings");
+    Require(viewState.ShowSettings && viewState.ShowPageTitle && !viewState.ShowEmptyState && !viewState.ShowSearchRow,
+        "Settings must hide the directory states");
+    viewState.Navigate("favorites");
+    Require(viewState.ShowEmptyState && viewState.EmptyActionText == "查看全部应用",
+        "An empty favorites page must offer the full directory");
+    viewState.Navigate("apps");
+
+    viewState.SetShutdown(started:true, stopping:true);
+    Require(viewState.IsBusy && !viewState.IsSearchEnabled && !viewState.IsDevicePickerEnabled && !viewState.IsSettingsEnabled && !viewState.IsEmptyActionEnabled,
+        "Cleanup must disable directory and settings controls");
+    Require(viewState.ConnectionStatus == "等待退出" && viewState.DeviceHint == "正在结束会话" && !viewState.IsConnectedStatus,
+        "Cleanup must replace the connection and device hints");
+    viewState.SetShutdown(started:true, stopping:false);
+    Require(!viewState.IsBusy && !viewState.IsSearchEnabled && viewState.ConnectionStatus == "等待退出",
+        "A finished cleanup attempt must keep the controls disabled");
+    viewState.SetShutdown(started:true, stopping:true);
+    Require(viewState.IsBusy && !viewState.IsSearchEnabled, "A retried cleanup attempt must wait again without re-enabling controls");
+    viewState.SetShutdown(started:true, stopping:false);
+    viewState.SetShutdown(started:false, stopping:false);
+    Require(viewState.IsSearchEnabled && viewState.ConnectionStatus == "已连接",
+        "Restoring interaction must return the live device state");
+}
+Console.WriteLine("PASS: derived view state covers scanning, loading, pages and cleanup without UI types");
 await ShutdownChecks.RunAsync();
 static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 static VirCre.Launcher.PhoneDevice DeviceWithApi(int? api) =>

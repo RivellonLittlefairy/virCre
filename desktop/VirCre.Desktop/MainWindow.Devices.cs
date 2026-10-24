@@ -22,6 +22,7 @@ public sealed partial class MainWindow {
     private void Devices_Changed() {
         if (closing) return;
         var state = devices.State;
+        model.UpdateDeviceSelection(state);
         syncingDevices = true;
         try {
             if (!ReferenceEquals(DevicePicker.ItemsSource, state.Devices)) DevicePicker.ItemsSource = state.Devices;

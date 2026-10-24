@@ -79,6 +79,7 @@ public sealed partial class MainWindow : Window {
         if (closing) return;
         ClearStatusMessage();
         closing = true;
+        model.SetShutdown(started:true,stopping:true);
         Root.IsHitTestVisible = false;
         Navigation.IsEnabled = false;
         FooterStatus.Text = "正在关闭应用窗口并停止设备读取…";
@@ -91,6 +92,7 @@ public sealed partial class MainWindow : Window {
                 appWindows.StopAsync,()=>appWindows.Windows.Count>0,
                 enabled=>{Root.IsHitTestVisible=enabled;Navigation.IsEnabled=enabled;});
             foreach(var failure in result.Failures)RuntimeDiagnostics.Write(failure.Error is TimeoutException?"shutdown-timeout":"shutdown-work-failed",failure.Error,failure.Name);
+            model.SetShutdown(windowShutdown.HasStarted,windowShutdown.IsStopping);
             if(!result.CanClose) {
                 RestoreCleanupControls(result.Failures.Any(failure=>failure.Error is TimeoutException)
                     ?$"收尾等待超过{windowShutdown.WaitLimit.TotalSeconds:0.###}秒，界面已恢复；后台任务仍在结束，请稍后重试关闭。剩余应用窗口可在运行中页面关闭。"
@@ -109,6 +111,7 @@ public sealed partial class MainWindow : Window {
     }
     private void RestoreCleanupControls(string message) {
         closing=false;Root.IsHitTestVisible=true;Navigation.IsEnabled=true;
+        model.SetShutdown(windowShutdown.HasStarted,windowShutdown.IsStopping);
         model.UpdateWindows(appWindows.Windows);
         Navigation.SelectedItem=Navigation.MenuItems.OfType<NavigationViewItem>().First(item=>Equals(item.Tag,"running"));
         model.Navigate("running");
@@ -196,6 +199,8 @@ public sealed partial class MainWindow : Window {
         Root.RequestedTheme = ThemeChoice.SelectedIndex switch { 1 => ElementTheme.Light, 2 => ElementTheme.Dark, _ => ElementTheme.Default };
         model.SetTheme(ThemeChoice.SelectedIndex switch {1=>"Light",2=>"Dark",_=>"System"});
     }
+    /// <summary>Compiled-bind helper: x:Bind cannot resolve a converter from a Window root.</summary>
+    private Visibility ViewVisibility(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
     private void UpdateCaptionColors() {
         var dark = Root.ActualTheme == ElementTheme.Dark;
         AppWindow.TitleBar.ButtonForegroundColor = dark ? Color.FromArgb(255, 255, 255, 255) : Color.FromArgb(255, 0, 0, 0);
@@ -205,40 +210,22 @@ public sealed partial class MainWindow : Window {
     }
     private void RenderState() {
         if (!ready || closing) return;
-        var cleanupOnly=windowShutdown.HasStarted;
-        var deviceState=devices.State;
-        var scanning=deviceState.Scanning;
-        PageTitle.Visibility=model.Page is "settings" or "running"?Visibility.Visible:Visibility.Collapsed;
-        var device=deviceState.Selected;
-        DeviceHint.Text = cleanupOnly?"正在结束会话":scanning ? "正在检查设备…" :
-            device is {State:DeviceState.Online}?$"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}":"连接后选择设备";
-        ConnectionStatus.Text = cleanupOnly?"等待退出":model.DeviceStatus;
-        var statusBrush=StatusBrush(!cleanupOnly && model.HasDevice && model.ErrorMessage.Length==0);
+        RenderConnection();
+        RenderNavigation();
+        RenderCameraCompatibility(windowShutdown.HasStarted);
+        if (SearchBox.Text != model.Query) SearchBox.Text = model.Query;
+    }
+    /// <summary>Theme and high-contrast brushes belong to the view; the model only reports state.</summary>
+    private void RenderConnection() {
+        var statusBrush=StatusBrush(model.IsConnectedStatus);
         ConnectionDot.Fill=FooterDot.Fill=statusBrush;
         ConnectionStatus.Foreground=statusBrush;
         RenderFooter();
-        LoadingRing.IsActive = cleanupOnly?windowShutdown.IsStopping:model.IsLoading || scanning;
-        SearchBox.IsEnabled = !cleanupOnly && !model.IsLoading && model.HasDevice;
-        DevicePicker.IsEnabled=!cleanupOnly && !scanning;
-        RefreshDevices.IsEnabled=!cleanupOnly && !scanning;
-        AppGrid.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading && model.HasDevice;ThemeChoice.IsEnabled=!cleanupOnly;
-        RenderCameraCompatibility(cleanupOnly);
+    }
+    /// <summary>Navigation items carry no compiled binding; cleanup only narrows them.</summary>
+    private void RenderNavigation() {
+        var cleanupOnly=windowShutdown.HasStarted;
         foreach(var item in Navigation.MenuItems.OfType<NavigationViewItem>())item.IsEnabled=!cleanupOnly || Equals(item.Tag,"running");
         if(Navigation.SettingsItem is NavigationViewItem settingsItem)settingsItem.IsEnabled=!cleanupOnly;
-        EmptyTitle.Text = scanning ? "正在查找手机" : model.EmptyTitle;
-        EmptyDescription.Text = scanning ? "正在检查已授权的 ADB 设备。" : model.EmptyDescription;
-        if (SearchBox.Text != model.Query) SearchBox.Text = model.Query;
-        EmptyIcon.Glyph = model.Page == "running" ? "\uE7F4" : !model.HasDevice?"\uE8EA":model.Page == "favorites" ? "\uE734" : "\uE721";
-        EmptySteps.Visibility=!model.HasDevice && model.Page is "apps" or "favorites"?Visibility.Visible:Visibility.Collapsed;
-        EmptyAction.Content=model.Page=="running"?"查看全部应用":!model.HasDevice || model.ErrorMessage.Length>0?"刷新设备":model.Query.Length>0?"清空搜索":model.Page=="favorites"?"查看全部应用":"刷新设备与应用";
-        EmptyAction.IsEnabled=!cleanupOnly && !scanning && !model.IsLoading;
-        var settings = model.Page == "settings";
-        var running = model.Page == "running";
-        SettingsContent.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
-        SearchRow.Visibility = settings || running || !model.HasDevice && model.CatalogCount==0 ? Visibility.Collapsed : Visibility.Visible;
-        AppGrid.Visibility = settings || model.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
-        if (running) AppGrid.Visibility = Visibility.Collapsed;
-        RunningList.Visibility = running && !model.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
-        EmptyState.Visibility = !settings && model.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
     }
 }
