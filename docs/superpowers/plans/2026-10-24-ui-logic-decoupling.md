@@ -1,6 +1,6 @@
 # virCre UI 与逻辑解耦改造计划
 
-> 执行方式：使用 `superpowers:executing-plans` 逐项实施。每项完成后更新复选框。任务 01–03 已执行，其余待用户确认后继续。
+> 执行方式：使用 `superpowers:executing-plans` 逐项实施。每项完成后更新复选框。任务 01–07 已执行，其余待用户确认后继续。
 
 **Goal：** 减少主窗口中的业务编排和重复状态判断，让设备刷新、应用启动、快捷方式等流程可以脱离 WinUI 控件复用。
 
@@ -114,10 +114,10 @@ Desktop 构建包含其依赖，不需要先把依赖全部再构建一遍。本
 
 修改：`desktop/VirCre.Desktop/MainWindow.xaml`、`MainWindow.xaml.cs`。
 
-- [ ] 为 XAML 暴露只读 `public ShellViewModel Model => model`；模型仍在 `InitializeComponent()` 前创建。
-- [ ] 将页标题、应用计数、收藏计数、运行窗口计数、空状态标题和描述逐组改为 `x:Bind Model.<Property>, Mode=OneWay`。
-- [ ] 迁移过程中保留现有扫描提示优先级：仍含窗口本地条件的字段先不绑定，留待任务 08、09 处理。
-- [ ] 删除已迁移字段的手工赋值，确保同一属性只有一个写入来源；静态检查并构建 Desktop，单独提交。
+- [x] 为 XAML 暴露只读 `public ShellViewModel Model => model`；模型仍在 `InitializeComponent()` 前创建。
+- [x] 将页标题、应用计数、收藏计数、运行窗口计数改为 `x:Bind Model.<Property>, Mode=OneWay`；空状态标题和描述仍含扫描提示优先级，按下一项留待任务 08、09。
+- [x] 迁移过程中保留现有扫描提示优先级：仍含窗口本地条件的字段先不绑定，留待任务 08、09 处理。
+- [x] 删除已迁移字段的手工赋值，确保同一属性只有一个写入来源；静态检查并构建 Desktop，单独提交。
 
 验收：搜索、收藏、页面切换及窗口开关后的文本和计数更新保持一致。页脚消息、主题刷色和交互禁用暂不迁移。
 
@@ -129,10 +129,10 @@ Desktop 构建包含其依赖，不需要先把依赖全部再构建一遍。本
 
 建议接口：构造时传入 `Action<UserSettings> save`；提供 `Task EnqueueAsync(UserSettings snapshot)`、`Task StopAsync()`。窗口把 `settingsStore.Save` 传入，验证代码使用假保存函数。
 
-- [ ] 移出串行写入、任务追踪与停止接收新请求的逻辑；每次请求持有设置快照。
-- [ ] 单次保存失败能由调用方观察，但不能阻断后续保存；错误显示和 UI 线程派发仍由 Desktop 完成。
-- [ ] `StopAsync()` 幂等，等待已接收请求，关闭后的新请求明确拒绝；退出清单等待队列而非窗口内的 `settingsTask`。
-- [ ] 补充保存顺序、一次失败后继续、停止等待和停止后拒绝场景；静态检查并构建 Desktop，单独提交。
+- [x] 移出串行写入、任务追踪与停止接收新请求的逻辑；每次请求持有设置快照。
+- [x] 单次保存失败能由调用方观察，但不能阻断后续保存；错误显示和 UI 线程派发仍由 Desktop 完成。
+- [x] `StopAsync()` 幂等，等待已接收请求，关闭后的新请求明确拒绝；退出清单等待队列而非窗口内的 `settingsTask`。
+- [x] 补充保存顺序、一次失败后继续、停止等待和停止后拒绝场景；静态检查并构建 Desktop，单独提交。
 
 验收：快速切换设置时最终文件对应最后一次请求，错误提示仍显示，关闭不丢弃已接收的写入。
 
@@ -144,10 +144,10 @@ Desktop 构建包含其依赖，不需要先把依赖全部再构建一遍。本
 
 建议接口：构造时接收同一个 `AppWindowManager`；提供 `Task<AppOpenResult> OpenAsync(PhoneDevice device, string packageName, string name, bool virtualCameraEnabled, int frameRate, CancellationToken token)`。
 
-- [ ] 将现有 `CreateLaunchRequest()` 的窗口复用与兼容性处理移入服务。
-- [ ] 卡片和现有快捷方式启动流程都调用该服务，设置值在发起操作时作为快照传入。
-- [ ] 保持设备硬件标识、已有窗口模式和 `AndroidCompatibility` 规则；不修改 scrcpy 参数与 Camera 实现。
-- [ ] 使用现有假窗口进程补充同一应用复用、改变默认模式后复用、不同手机同包名分别启动场景；静态检查并构建 Desktop，单独提交。
+- [x] 将现有 `CreateLaunchRequest()` 的窗口复用与兼容性处理移入服务。
+- [x] 卡片和现有快捷方式启动流程都调用该服务，设置值在发起操作时作为快照传入。
+- [x] 保持设备硬件标识、已有窗口模式和 `AndroidCompatibility` 规则；不修改 scrcpy 参数与 Camera 实现。
+- [x] 使用现有假窗口进程补充同一应用复用、改变默认模式后复用、不同手机同包名分别启动场景；静态检查并构建 Desktop，单独提交。
 
 验收：两个入口的窗口复用和 Android 版本兼容行为一致，仍只有一个窗口管理器拥有进程。
 
@@ -159,10 +159,10 @@ Desktop 构建包含其依赖，不需要先把依赖全部再构建一遍。本
 
 建议接口：构造时接收 `IPhoneCatalog`、`ICommandRunner`、`AppLaunchService`，以及 `Func<string,string,CancellationToken,Task<bool>> canLaunch`；提供 `Task<AppOpenResult> OpenAsync(string payload, UserSettings settings, CancellationToken token)`。
 
-- [ ] 移入参数解码、设备查询、硬件身份解析、应用入口校验和启动调用；继续复用 `ShortcutRequest`。
-- [ ] 在统一装配位置将 `PhoneCatalog.CanLaunchAsync` 作为委托传入；不为了单个调用增加一整套仓储接口，也不在点击处理函数内创建依赖。
-- [ ] 窗口保留连续快捷方式激活的排队、提示及显示主窗口逻辑；服务不引用 `Window`、Dispatcher 或控件。
-- [ ] 补充无线地址变化、地址被另一手机复用、设备未授权、应用已卸载、无可见列表时直启场景；静态检查并构建 Desktop，单独提交。
+- [x] 移入参数解码、设备查询、硬件身份解析、应用入口校验和启动调用；继续复用 `ShortcutRequest`。
+- [x] 在统一装配位置将 `PhoneCatalog.CanLaunchAsync` 作为委托传入；不为了单个调用增加一整套仓储接口，也不在点击处理函数内创建依赖。
+- [x] 窗口保留连续快捷方式激活的排队、提示及显示主窗口逻辑；服务不引用 `Window`、Dispatcher 或控件。
+- [x] 补充无线地址变化、地址被另一手机复用、设备未授权、应用已卸载、无可见列表时直启场景；静态检查并构建 Desktop，单独提交。
 
 验收：快捷方式业务流程可用假目录和假命令运行；所有入口继续使用同一个 `AppLaunchService` 和 `AppWindowManager`。此时仍允许保留隐藏主窗口。
 
