@@ -25,10 +25,12 @@ public sealed partial class MainWindow {
         return appWindows.Windows.FirstOrDefault(value=>value.Request.IsForDevice(device) && value.PackageName==packageName)?.Request
             ?? AndroidCompatibility.CreateLaunchRequest(device,packageName,name,model.VirtualCameraEnabled,model.CameraFrameRate);
     }
+    private bool CanActOnCard(AppCard card,PhoneDevice? device) =>
+        AppActionGuard.CanActOn(card,device,model,scanning,closing || windowShutdown.HasStarted);
     private async Task OpenCardAsync(AppCard card) {
         if (closing || windowShutdown.HasStarted) return;
-        if (scanning || model.IsLoading || !model.HasDevice || DevicePicker.SelectedItem is not PhoneDevice { State: DeviceState.Online } device ||
-            card.SourceSerial != device.Serial || model.CurrentSerial != device.Serial || !model.Apps.Any(app => app.PackageName == card.PackageName)) {
+        var device=DevicePicker.SelectedItem as PhoneDevice;
+        if (device is null || !CanActOnCard(card,device)) {
             ShowAction("设备或应用列表已经变化，请刷新后重新选择。", true);return;
         }
         ShowAction($"正在打开 {card.Name}…");

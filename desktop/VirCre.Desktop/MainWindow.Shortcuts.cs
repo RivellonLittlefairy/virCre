@@ -52,18 +52,19 @@ public sealed partial class MainWindow {
             DispatcherQueue.TryEnqueue(CloseIdleShortcutSession);
         }
     }
-    private Task<ShortcutCreation> PrepareShortcutAsync(AppCard card, string directory,bool desktop=false) {
+    private Task<ShortcutCreation> PrepareShortcutAsync(AppCard card, string directory,bool desktop=false,PhoneDevice? device=null) {
         shortcutWrites.RemoveAll(t=>t.IsCompleted);
-        var work=CreateShortcutCoreAsync(card,directory,desktop);
+        var work=CreateShortcutCoreAsync(card,directory,desktop,device);
         shortcutWrites.Add(ObserveWriteAsync(work));
         return work;
     }
     private static async Task ObserveWriteAsync(Task work) {try {await work;} catch(Exception) { /* UI action reports the error; shutdown only waits for completion. */ }}
-    private async Task<ShortcutCreation> CreateShortcutCoreAsync(AppCard card,string directory,bool desktop) {
-        if(closing || windowShutdown.HasStarted || scanning || model.IsLoading || DevicePicker.SelectedItem is not PhoneDevice {State:DeviceState.Online} device ||
-            card.SourceSerial!=device.Serial || model.CurrentSerial!=device.Serial || !model.Apps.Any(a=>a.PackageName==card.PackageName)) throw new IOException("设备或应用已变化，请重新选择。");
+    private async Task<ShortcutCreation> CreateShortcutCoreAsync(AppCard card,string directory,bool desktop,PhoneDevice? device) {
+        if(device is null || !CanActOnCard(card,device)) throw new IOException("设备或应用已变化，请重新选择。");
         var hardware=device.HardwareId.Length>0?device.HardwareId:await ShortcutRequest.GetHardwareIdAsync(new CommandRunner(),device.Serial,lifetime.Token);
         if(hardware.Length==0) throw new IOException("无法读取手机稳定标识，暂不能创建自动连接快捷方式。请检查 ADB 授权后重试。");
+        // Reading the hardware identity may take a while; fail before writing anything if the target moved on.
+        if(!CanActOnCard(card,device)) throw new IOException("设备或应用已变化，请重新选择。");
         var request=new ShortcutRequest(device.Serial,hardware,device.Model,card.PackageName,card.Name);
         lifetime.Token.ThrowIfCancellationRequested();
         return await Task.Run(()=>desktop?ShortcutFiles.CreateWithFallback(request,card.IconPath,directory,Path.Combine(ShortcutDataDirectory,"shortcuts")):
@@ -72,7 +73,7 @@ public sealed partial class MainWindow {
     private async void CreateShortcut_Click(object sender,RoutedEventArgs args) {
         if((sender as MenuFlyoutItem)?.Tag is not AppCard card) return;
         try {
-            var created=await PrepareShortcutAsync(card,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),desktop:true);
+            var created=await PrepareShortcutAsync(card,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),desktop:true,device:DevicePicker.SelectedItem as PhoneDevice);
             if(!created.Staged) ShowAction("已创建桌面快捷方式："+Path.GetFileNameWithoutExtension(created.Path));
             else {
                 ShowAction("桌面暂不可写，快捷方式已生成。可打开所在文件夹，将它拖到桌面。");

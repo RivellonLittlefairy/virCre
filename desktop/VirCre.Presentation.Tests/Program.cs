@@ -141,6 +141,33 @@ Require(rejectedFrameRate && preferenceModel.CameraFrameRate == 24 && preference
 Require(!preferenceNotifications.Contains(nameof(ShellViewModel.Page)), "Preference changes must not broadcast unrelated state");
 Console.WriteLine("PASS: preference setters notify only real changes and save once each");
 
+var guardModel = new ShellViewModel();
+var guardDevice = new VirCre.Launcher.PhoneDevice("phone.guard","Guard",VirCre.Launcher.DeviceState.Online);
+using (var guardController = new CatalogController(new ImmediateCatalog(), guardModel)) {
+    await guardController.SelectAsync(guardDevice);
+    var guardCard = guardModel.Apps.Single();
+    Require(AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,false,false),"A live card on the selected online phone must be actionable");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,true,false),"Scanning must block card actions");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice,guardModel,false,true),"Shutdown must block card actions");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Offline},guardModel,false,false),"An offline phone must block its cards");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {State=VirCre.Launcher.DeviceState.Unauthorized},guardModel,false,false),"An unauthorized phone must block its cards");
+    Require(!AppActionGuard.CanActOn(guardCard,guardDevice with {Serial="phone.other"},guardModel,false,false),"A card must not act on a different phone");
+    var otherDevice = new VirCre.Launcher.PhoneDevice("phone.other","Other",VirCre.Launcher.DeviceState.Online);
+    await guardController.SelectAsync(otherDevice);
+    Require(!AppActionGuard.CanActOn(guardCard,otherDevice,guardModel,false,false),"A card from the previous phone must not act after switching");
+}
+var loadingModel = new ShellViewModel();
+var loadingSource = new ControlledCatalog();
+using (var loadingController = new CatalogController(loadingSource, loadingModel)) {
+    var loadingDevice = new VirCre.Launcher.PhoneDevice("phone.loading","Loading",VirCre.Launcher.DeviceState.Online);
+    var loading = loadingController.SelectAsync(loadingDevice);
+    Require(loadingModel.IsLoading,"Fixture must keep the catalog loading");
+    Require(!AppActionGuard.CanActOn(new AppCard("App","com.real.app","","#000000",SourceSerial:"phone.loading"),loadingDevice,loadingModel,false,false),"Loading must block card actions");
+    loadingSource.Pending["phone.loading"].SetResult([]);
+    await loading;
+}
+Console.WriteLine("PASS: card actions require the live device, catalog, and idle launcher");
+
 var shutdownModel = new ShellViewModel();
 var shutdownSource = new ControlledCatalog();
 var shutdownController = new CatalogController(shutdownSource, shutdownModel);

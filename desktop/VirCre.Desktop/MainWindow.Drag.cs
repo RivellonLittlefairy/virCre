@@ -10,10 +10,11 @@ using Windows.Foundation;
 namespace VirCre.Desktop;
 
 public sealed partial class MainWindow {
-    private sealed class DragGesture(UIElement source,uint pointer,Point origin,object ticket) {
+    private sealed class DragGesture(UIElement source,uint pointer,Point origin,PhoneDevice? device,object ticket) {
         public UIElement Source {get;}=source;
         public uint Pointer {get;}=pointer;
         public Point Origin {get;}=origin;
+        public PhoneDevice? Device {get;}=device;
         public bool Preparing {get;set;}
         public object Ticket {get;}=ticket;
     }
@@ -49,7 +50,7 @@ public sealed partial class MainWindow {
         if(args.Pointer.PointerDeviceType==Microsoft.UI.Input.PointerDeviceType.Touch)return;
         for(var current=args.OriginalSource as DependencyObject;current!=null && !ReferenceEquals(current,sender);current=VisualTreeHelper.GetParent(current))
             if(current is ButtonBase button && button.Tag is not AppCard) return;
-        dragGesture=new(source,args.Pointer.PointerId,args.GetCurrentPoint(source).Position,dragOwnership.Begin());
+        dragGesture=new(source,args.Pointer.PointerId,args.GetCurrentPoint(source).Position,DevicePicker.SelectedItem as PhoneDevice,dragOwnership.Begin());
     }
     private void AppCard_PointerReleased(object sender,PointerRoutedEventArgs args) {
         if(dragGesture?.Pointer!=args.Pointer.PointerId) return;
@@ -76,14 +77,14 @@ public sealed partial class MainWindow {
                 if(dragFiles.Count>=64) dragFiles.Clear();
                 var staging=Path.Combine(ShortcutDataDirectory,"drag");
                 CacheMaintenance.Prune(staging,29,TimeSpan.FromDays(7));
-                preparation=PrepareShortcutAsync(card,Path.Combine(staging,Guid.NewGuid().ToString("N")));
+                preparation=PrepareShortcutAsync(card,Path.Combine(staging,Guid.NewGuid().ToString("N")),device:gesture.Device);
                 dragFiles[key]=preparation;
                 ShowAction("正在准备快捷方式，请保持鼠标按下…");
             }
             var created=await preparation;
             if(closing || windowShutdown.HasStarted) return;
             if(!dragOwnership.IsCurrent(gesture.Ticket)) {ShowAction("快捷方式已准备好，请再拖动一次应用卡片。");return;}
-            if(model.CurrentSerial!=card.SourceSerial || model.IsLoading || scanning) throw new IOException("设备或应用已经变化，请重新选择。");
+            if(!CanActOnCard(card,gesture.Device)) throw new IOException("设备或应用已经变化，请重新选择。");
             dragOwnership.Release(gesture.Ticket,()=>{dragGesture=null;source.ReleasePointerCaptures();});
             var finished=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             nativeDragTask=finished.Task;
