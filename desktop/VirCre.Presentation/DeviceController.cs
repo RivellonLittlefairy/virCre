@@ -41,8 +41,10 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
     /// <summary>Stops accepting work, cancels discovery and waits for every accepted request.</summary>
     public async Task StopAsync() {
         Dispose();
-        await Task.WhenAll(pending.ToArray());
-        await catalog.StopAsync();
+        // Direct selections may use a caller token that shutdown cannot cancel.
+        // Stop the catalog now, then wait for both discovery and app-reader cleanup.
+        var catalogStop = catalog.StopAsync();
+        await Task.WhenAll(pending.Append(catalogStop).ToArray());
     }
 
     /// <summary>

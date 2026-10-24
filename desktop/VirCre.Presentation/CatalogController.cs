@@ -27,22 +27,24 @@ public sealed class CatalogController(IPhoneCatalog phone, ShellViewModel model)
         active?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(token);
         active = request;
-        model.BeginLoad(device);
+        model.BeginLoad(device, () => IsCurrent(ticket));
         if (device?.State != DeviceState.Online) { active = null; return; }
         try {
             var apps = await phone.GetAppsAsync(device.Serial, request.Token, forceRefresh);
-            if (!disposed && ticket == generation) {
+            if (IsCurrent(ticket)) {
                 request.Token.ThrowIfCancellationRequested();
-                model.CompleteLoad(apps);
+                // Ownership may change while this result waits in the host's UI queue.
+                model.CompleteLoad(apps, () => IsCurrent(ticket) && !request.IsCancellationRequested && !token.IsCancellationRequested);
             }
         } catch (OperationCanceledException) {
-            if (!disposed && ticket == generation) model.FailLoad(model.Text[TextKeys.LoadCancelled]);
+            if (IsCurrent(ticket)) model.FailLoad(model.Text[TextKeys.LoadCancelled], () => IsCurrent(ticket));
         } catch (Exception error) when (CatalogErrors.IsExpected(error)) {
-            if (!disposed && ticket == generation) model.FailLoad(error.Message);
+            if (IsCurrent(ticket)) model.FailLoad(error.Message, () => IsCurrent(ticket));
         } finally {
             if (ReferenceEquals(active, request)) active = null;
         }
     }
+    private bool IsCurrent(int ticket) => !disposed && ticket == generation;
     public void Dispose() {
         disposed = true;
         generation++;

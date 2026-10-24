@@ -319,6 +319,22 @@ using (var stopDevices = new DeviceController(stopSource, stopCatalog, stopModel
 }
 Console.WriteLine("PASS: shutdown waits for every in-flight device scan and rejects late results");
 
+var stopAppsSource = new CancellableAppCatalog();
+var stopAppsModel = new ShellViewModel();
+using (var stopAppsCatalog = new CatalogController(stopAppsSource, stopAppsModel))
+using (var stopAppsDevices = new DeviceController(stopAppsSource, stopAppsCatalog, stopAppsModel)) {
+    var appRead = stopAppsDevices.SelectAsync(Device("p.stop", "Stopping", "hw-stop"), CancellationToken.None);
+    var appStop = stopAppsDevices.StopAsync();
+    try {
+        await stopAppsSource.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Require(!appStop.IsCompleted, "Stopping must wait for the cancelled app reader to finish cleanup");
+    } finally { stopAppsSource.Cleanup.TrySetResult(); }
+    await appStop.WaitAsync(TimeSpan.FromSeconds(2));
+    await appRead;
+    Require(stopAppsModel.Apps.Count == 0, "Stopping a selected-device load must reject its late data");
+}
+Console.WriteLine("PASS: stopping a direct selection cancels app loading before waiting for cleanup");
+
 var viewState = new ShellViewModel();
 Require(viewState.ShowEmptyState && !viewState.ShowAppGrid && !viewState.ShowSearchRow && !viewState.ShowPageTitle && !viewState.IsSearchEnabled,
     "An empty start must show only the empty state");
@@ -352,6 +368,11 @@ using (var viewCatalog = new CatalogController(viewSource, viewState)) {
     viewState.Navigate("settings");
     Require(viewState.ShowSettings && viewState.ShowPageTitle && !viewState.ShowEmptyState && !viewState.ShowSearchRow,
         "Settings must hide the directory states");
+    var recoveredView = viewCatalog.SelectAsync(viewDevice, CancellationToken.None);
+    viewSource.LastApps("p.view").SetResult([new("View app", "com.view.app", false)]);
+    await recoveredView;
+    Require(viewState.ErrorMessage.Length == 0 && viewState.IsConnectedStatus,
+        "The normal page and cleanup fixtures require a successful recovery from the previous read error");
     viewState.Navigate("favorites");
     Require(viewState.ShowEmptyState && viewState.EmptyActionText == "查看全部应用",
         "An empty favorites page must offer the full directory");
@@ -390,6 +411,43 @@ using (var marshalCatalog = new CatalogController(marshalSource, marshalModel)) 
 }
 Console.WriteLine("PASS: model and catalog publish only through the host dispatcher");
 
+foreach (var oldOutcome in new[] {"success", "failure"}) {
+    var queuedDispatcher = new ManualDispatcher();
+    var queuedModel = new ShellViewModel(dispatcher: queuedDispatcher);
+    var queuedSource = new ScriptedPhoneCatalog();
+    using var queuedCatalog = new CatalogController(queuedSource, queuedModel);
+    var oldRead = queuedCatalog.SelectAsync(Device("p.old", "Old", "hw-old"), CancellationToken.None);
+    queuedDispatcher.RunPending();
+    if (oldOutcome == "success") queuedSource.LastApps("p.old").SetResult([new("Old app", "com.old.app", false)]);
+    else queuedSource.LastApps("p.old").SetException(new IOException("Old read failed"));
+    await oldRead;
+
+    Task currentRead = Task.CompletedTask;
+    queuedDispatcher.RunOnUi(() => currentRead = queuedCatalog.SelectAsync(Device("p.new", "New", "hw-new"), CancellationToken.None));
+    queuedDispatcher.RunPending();
+    Require(queuedModel.CurrentSerial == "p.new" && queuedModel.IsLoading && queuedModel.Apps.Count == 0 && queuedModel.ErrorMessage.Length == 0,
+        "An old queued " + oldOutcome + " must not change the new device's pending load");
+    queuedSource.LastApps("p.new").SetResult([new("New app", "com.new.app", false)]);
+    await currentRead;
+    queuedDispatcher.RunPending();
+    Require(queuedModel.Apps.Single().PackageName == "com.new.app" && queuedModel.Apps.Single().SourceSerial == "p.new",
+        "The current device must publish its own app list after rejecting old queued callbacks");
+}
+
+var stoppedDispatcher = new ManualDispatcher();
+var stoppedModel = new ShellViewModel(dispatcher: stoppedDispatcher);
+var stoppedSource = new ScriptedPhoneCatalog();
+using (var stoppedCatalog = new CatalogController(stoppedSource, stoppedModel)) {
+    var queuedRead = stoppedCatalog.SelectAsync(Device("p.ended", "Ended", "hw-ended"), CancellationToken.None);
+    stoppedDispatcher.RunPending();
+    stoppedSource.LastApps("p.ended").SetResult([new("Ended app", "com.ended.app", false)]);
+    await queuedRead;
+    await stoppedCatalog.StopAsync();
+    stoppedDispatcher.RunPending();
+    Require(stoppedModel.Apps.Count == 0, "A completed but still queued app list must not publish after shutdown");
+}
+Console.WriteLine("PASS: queued catalog results recheck ownership after device changes and shutdown");
+
 var missingKeys = typeof(TextKeys).GetFields(BindingFlags.Public|BindingFlags.Static)
     .Where(field => field.IsLiteral).Select(field => (string)field.GetRawConstantValue()!)
     .Where(key => ShellText.Default[key] == key).ToArray();
@@ -418,9 +476,22 @@ static async Task Until(Func<bool> ready) {
 /// <summary>Queues work like a UI dispatcher whose thread is not the caller's.</summary>
 sealed class ManualDispatcher : IDispatcher {
     private readonly Queue<Action> pending = new();
-    public bool HasAccess => false;
-    public void Post(Action work) => pending.Enqueue(work);
-    public void RunPending() { while(pending.Count>0)pending.Dequeue()(); }
+    public bool HasAccess {get;private set;}
+    public void Post(Action work) { if(HasAccess)work(); else pending.Enqueue(work); }
+    public void RunOnUi(Action work) {
+        var previous=HasAccess;HasAccess=true;
+        try {work();} finally {HasAccess=previous;}
+    }
+    public void RunPending() => RunOnUi(() => { while(pending.Count>0)pending.Dequeue()(); });
+}
+sealed class CancellableAppCatalog : VirCre.Launcher.IPhoneCatalog {
+    public TaskCompletionSource Cancelled {get;}=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource Cleanup {get;}=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task<IReadOnlyList<VirCre.Launcher.PhoneDevice>> GetDevicesAsync(CancellationToken token)=>throw new NotSupportedException();
+    public async Task<IReadOnlyList<VirCre.Launcher.PhoneApp>> GetAppsAsync(string serial,CancellationToken token) {
+        try {await Task.Delay(Timeout.Infinite,token);return [];}
+        finally {Cancelled.TrySetResult();await Cleanup.Task;}
+    }
 }
 sealed class ControlledCatalog : VirCre.Launcher.IPhoneCatalog {
     public Dictionary<string, TaskCompletionSource<IReadOnlyList<VirCre.Launcher.PhoneApp>>> Pending {get;} = new();

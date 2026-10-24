@@ -135,7 +135,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         if(!favorites.Add(packageName))favorites.Remove(packageName);
         catalog[index]=catalog[index] with {IsFavorite=favorites.Contains(packageName)};Refresh();SettingsChanged?.Invoke();
     });
-    internal void BeginLoad(PhoneDevice? device) => Dispatcher.Post(() => {
+    internal void BeginLoad(PhoneDevice? device, Func<bool>? canPublish = null) => Dispatcher.Post(() => {
+        if(canPublish?.Invoke()==false)return;
         currentDevice=device;
         IsPreview=false;catalog.Clear();Query="";
         DeviceLabel=device?.Model??Text[TextKeys.NoDevice];
@@ -148,12 +149,16 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         };
         Refresh();
     });
-    internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) => Dispatcher.Post(() => {
+    internal void CompleteLoad(IReadOnlyList<PhoneApp> apps, Func<bool>? canPublish = null) => Dispatcher.Post(() => {
+        if(canPublish?.Invoke()==false)return;
         catalog.Clear();
         foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial,app.IconPath){Text=Text});
         IsLoading=false;ErrorMessage="";Refresh();
     });
-    internal void FailLoad(string error) => Dispatcher.Post(() => {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();});
+    internal void FailLoad(string error, Func<bool>? canPublish = null) => Dispatcher.Post(() => {
+        if(canPublish?.Invoke()==false)return;
+        catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();
+    });
     public void ReportDeviceError(string error, bool preserveCatalog = false) => Dispatcher.Post(() => {
         if (preserveCatalog && catalog.Count > 0) {
             HasDevice=false;IsLoading=false;ErrorMessage=error;
