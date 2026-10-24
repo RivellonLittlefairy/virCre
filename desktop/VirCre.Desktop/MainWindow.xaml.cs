@@ -16,7 +16,7 @@ public sealed partial class MainWindow : Window {
     private XamlRoot? observedRoot;
     private double minimumScale;
     private bool allowClose;
-    private readonly ShutdownCoordinator windowShutdown=new();
+    private readonly ShutdownCoordinator windowShutdown;
 
     /// <summary>Read-only surface for compiled bindings; the window never replaces the model.</summary>
     public ShellViewModel Model => model;
@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window {
         var settings = LoadSettings();
         RuntimeDiagnostics.Write("startup",details:DataDirectory);
         model = new(settings: settings.Settings, dispatcher: new WindowDispatcher(DispatcherQueue));
+        windowShutdown = new(text: model.Text);
         catalogController = new(phone, model);
         devices = new(phone, catalogController, model);
         InitializeComponent();

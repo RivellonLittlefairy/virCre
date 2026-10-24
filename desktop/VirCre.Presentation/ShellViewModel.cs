@@ -13,10 +13,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     private readonly ObservableCollection<RunningWindowCard> runningCards = [];
     private readonly Dictionary<Guid,AppCard> windowArtwork = [];
     private PhoneDevice? currentDevice;
-    public ShellViewModel(bool preview = false, UserSettings? settings = null, IDispatcher? dispatcher = null) {
+    public ShellViewModel(bool preview = false, UserSettings? settings = null, IDispatcher? dispatcher = null, IShellText? text = null) {
         Dispatcher = dispatcher ?? ImmediateDispatcher.Instance;
+        Text = text ?? ShellText.Default;
+        DeviceLabel = Text[TextKeys.NoDevice];
         IsPreview = preview;
-        catalog = preview ? [.. DemoCatalog.Create()] : [];
+        catalog = preview ? [.. DemoCatalog.Create().Select(card => card with {Text=Text})] : [];
         if (settings != null) {
             favorites.UnionWith(settings.Favorites);Theme = settings.Theme;
             VirtualCameraEnabled=settings.VirtualCameraEnabled;CameraFrameRate=CameraFrameRates.Normalize(settings.CameraFrameRate);
@@ -27,6 +29,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public event Action? SettingsChanged;
     /// <summary>Host-supplied UI thread; every state change is published through it.</summary>
     public IDispatcher Dispatcher {get;}
+    /// <summary>Host-supplied wording; the model owns no user-visible literals.</summary>
+    public IShellText Text {get;}
     public string Theme {get;private set;} = "System";
     public bool VirtualCameraEnabled {get;private set;} = true;
     public int CameraFrameRate {get;private set;} = CameraFrameRates.Default;
@@ -58,20 +62,23 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     /// <summary>Shutdown is waiting for background work right now.</summary>
     public bool IsStopping {get;private set;}
     public DeviceSelectionState DeviceSelection {get;private set;} = new([], null, false);
-    public string DeviceLabel {get;private set;} = "未选择设备";
+    public string DeviceLabel {get;private set;} = "";
     public string ErrorMessage {get;private set;} = "";
     public string Query {get;private set;} = "";
     public string Page {get;private set;} = "apps";
     public bool IsEmpty => Page=="running" ? running.Count==0 : visible.Count==0;
-    public string ResultCount => $"{visible.Count} 个{(IsPreview ? "示例" : "")}应用";
+    public string ResultCount => Text.Format(IsPreview ? TextKeys.AppCountPreview : TextKeys.AppCount, visible.Count);
     public int CatalogCount => catalog.Count;
     public int FavoriteCount => catalog.Count(app => app.IsFavorite);
     public int RunningCount => running.Count;
-    public string DeviceStatus => IsLoading ? "读取中" : ErrorMessage.Length > 0 ? "需要重试" : HasDevice ? "已连接" : "未连接";
-    public string ConnectionStatus => IsCleanup ? "等待退出" : DeviceStatus;
+    public string DeviceStatus => Text[IsLoading ? TextKeys.StatusLoading : ErrorMessage.Length > 0 ? TextKeys.StatusRetry :
+        HasDevice ? TextKeys.StatusConnected : TextKeys.StatusDisconnected];
+    public string ConnectionStatus => IsCleanup ? Text[TextKeys.ConnectionWaitingExit] : DeviceStatus;
     public bool IsConnectedStatus => !IsCleanup && HasDevice && ErrorMessage.Length == 0;
-    public string DeviceHint => IsCleanup ? "正在结束会话" : DeviceSelection.Scanning ? "正在检查设备…" :
-        DeviceSelection.Selected is {State:DeviceState.Online} device ? $"{device.AndroidVersionLabel} · {(device.IsNetworkConnection?"无线连接":"USB 连接")}" : "连接后选择设备";
+    public string DeviceHint => IsCleanup ? Text[TextKeys.HintEndingSession] : DeviceSelection.Scanning ? Text[TextKeys.HintScanning] :
+        DeviceSelection.Selected is {State:DeviceState.Online} device
+            ? Text.Format(TextKeys.HintOnline, device.AndroidVersionLabel, Text[device.IsNetworkConnection ? TextKeys.LinkWireless : TextKeys.LinkUsb])
+            : Text[TextKeys.HintConnect];
     public bool IsBusy => IsCleanup ? IsStopping : DeviceSelection.Scanning || IsLoading;
     public bool IsSearchEnabled => !IsCleanup && !IsLoading && HasDevice;
     public bool IsDevicePickerEnabled => !IsCleanup && !DeviceSelection.Scanning;
@@ -86,26 +93,26 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     public bool ShowRunningList => Page == "running" && !IsEmpty;
     public bool ShowEmptyState => Page != "settings" && IsEmpty;
     public bool ShowEmptySteps => !HasDevice && Page is ("apps" or "favorites");
-    public string FooterText => IsPreview ? "示例应用 · 收藏仅本次有效，尚未连接手机" :
-        IsLoading ? $"正在从 {DeviceLabel} 读取应用列表…" : ErrorMessage.Length > 0 ? ErrorMessage :
-        HasDevice ? $"来自 {DeviceLabel} · {catalog.Count} 个应用 · 安装、卸载或更新应用后，请点击刷新" : "连接手机后，读取可启动的应用列表。";
-    public string Title => Page switch {"favorites" => "收藏", "running" => "运行中", "settings" => "设置", _ => "全部应用"};
+    public string FooterText => IsPreview ? Text[TextKeys.FooterPreview] :
+        IsLoading ? Text.Format(TextKeys.FooterLoading, DeviceLabel) : ErrorMessage.Length > 0 ? ErrorMessage :
+        HasDevice ? Text.Format(TextKeys.FooterConnected, DeviceLabel, catalog.Count) : Text[TextKeys.FooterConnect];
+    public string Title => Text[Page switch {"favorites" => TextKeys.TitleFavorites, "running" => TextKeys.TitleRunning, "settings" => TextKeys.TitleSettings, _ => TextKeys.TitleApps}];
     public string Description => Page switch {
-        "favorites" => "把常用的应用放在手边。",
-        "running" => "在这里管理独立打开的手机应用。",
-        "settings" => "让桌面工具更合你的习惯。",
-        _ => HasDevice ? $"来自 {DeviceLabel} 的手机应用。" : "手机上的应用，在桌面从容使用。"
+        "favorites" => Text[TextKeys.DescriptionFavorites],
+        "running" => Text[TextKeys.DescriptionRunning],
+        "settings" => Text[TextKeys.DescriptionSettings],
+        _ => HasDevice ? Text.Format(TextKeys.DescriptionDevice, DeviceLabel) : Text[TextKeys.DescriptionApps]
     };
-    public string EmptyTitle => DeviceSelection.Scanning ? "正在查找手机" : Page == "running" ? "还没有打开的应用" : IsLoading ? "正在读取手机应用" :
-        ErrorMessage.Length > 0 ? "暂时无法读取应用" : !HasDevice && !IsPreview ? "连接你的手机" :
-        Query.Trim().Length > 0 ? "没有找到匹配的应用" : Page == "favorites" ? "把常用应用放在这里" : "没有可启动的应用";
-    public string EmptyDescription => DeviceSelection.Scanning ? "正在检查已授权的 ADB 设备。" : Page == "running" ? "点击应用卡片打开后，即可在这里管理独立窗口。" :
-        IsLoading ? "首次读取可能需要一些时间，请保持手机连接。" : ErrorMessage.Length > 0 ? ErrorMessage :
-        !HasDevice && !IsPreview ? "连接并授权后，手机里的应用就会出现在这里。" : Query.Trim().Length > 0 ? "试试其他名称，或清空搜索内容。" :
-        Page == "favorites" ? "点击应用卡片右侧的星标，收藏将在重启后保留。" : "点击刷新，重新读取手机上的应用。";
+    public string EmptyTitle => Text[DeviceSelection.Scanning ? TextKeys.EmptyScanningTitle : Page == "running" ? TextKeys.EmptyRunningTitle :
+        IsLoading ? TextKeys.EmptyLoadingTitle : ErrorMessage.Length > 0 ? TextKeys.EmptyErrorTitle : !HasDevice && !IsPreview ? TextKeys.EmptyNoDeviceTitle :
+        Query.Trim().Length > 0 ? TextKeys.EmptyNoMatchTitle : Page == "favorites" ? TextKeys.EmptyFavoritesTitle : TextKeys.EmptyAppsTitle];
+    public string EmptyDescription => DeviceSelection.Scanning ? Text[TextKeys.EmptyScanningDescription] : Page == "running" ? Text[TextKeys.EmptyRunningDescription] :
+        IsLoading ? Text[TextKeys.EmptyLoadingDescription] : ErrorMessage.Length > 0 ? ErrorMessage :
+        !HasDevice && !IsPreview ? Text[TextKeys.EmptyNoDeviceDescription] : Query.Trim().Length > 0 ? Text[TextKeys.EmptyNoMatchDescription] :
+        Page == "favorites" ? Text[TextKeys.EmptyFavoritesDescription] : Text[TextKeys.EmptyAppsDescription];
     public string EmptyGlyph => Page == "running" ? "" : !HasDevice ? "" : Page == "favorites" ? "" : "";
-    public string EmptyActionText => Page == "running" ? "查看全部应用" : !HasDevice || ErrorMessage.Length > 0 ? "刷新设备" :
-        Query.Length > 0 ? "清空搜索" : Page == "favorites" ? "查看全部应用" : "刷新设备与应用";
+    public string EmptyActionText => Text[Page == "running" ? TextKeys.ActionViewAllApps : !HasDevice || ErrorMessage.Length > 0 ? TextKeys.ActionRefreshDevice :
+        Query.Length > 0 ? TextKeys.ActionClearSearch : Page == "favorites" ? TextKeys.ActionViewAllApps : TextKeys.ActionRefreshApps];
 
     /// <summary>Accepts the device controller snapshot; the model never reads the window.</summary>
     public void UpdateDeviceSelection(DeviceSelectionState selection) => Dispatcher.Post(() => {
@@ -131,19 +138,19 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
     internal void BeginLoad(PhoneDevice? device) => Dispatcher.Post(() => {
         currentDevice=device;
         IsPreview=false;catalog.Clear();Query="";
-        DeviceLabel=device?.Model??"未选择设备";
+        DeviceLabel=device?.Model??Text[TextKeys.NoDevice];
         CurrentSerial=device?.Serial??"";
         HasDevice=device?.State==DeviceState.Online;
         IsLoading=HasDevice;
         ErrorMessage=device?.State switch {
-            DeviceState.Unauthorized=>"请在手机上允许此电脑的 USB/无线调试授权，然后刷新设备。",
-            DeviceState.Offline=>"设备已离线，请检查连接后刷新设备。", _=>""
+            DeviceState.Unauthorized=>Text[TextKeys.LoadUnauthorized],
+            DeviceState.Offline=>Text[TextKeys.LoadOffline], _=>""
         };
         Refresh();
     });
     internal void CompleteLoad(IReadOnlyList<PhoneApp> apps) => Dispatcher.Post(() => {
         catalog.Clear();
-        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial,app.IconPath));
+        foreach(var app in apps) catalog.Add(new(app.Name,app.PackageName,"\uE8A9",AppColor(app.PackageName),favorites.Contains(app.PackageName),app.IsSystem,CurrentSerial,app.IconPath){Text=Text});
         IsLoading=false;ErrorMessage="";Refresh();
     });
     internal void FailLoad(string error) => Dispatcher.Post(() => {catalog.Clear();IsLoading=false;ErrorMessage=error;Refresh();});
@@ -179,7 +186,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged {
         for(var index=0;index<catalog.Count;index++) {
             var app=catalog[index];
             var window=currentDevice==null?null:running.FirstOrDefault(value=>value.PackageName==app.PackageName && value.Request.IsForDevice(currentDevice));
-            catalog[index]=app with {IsRunning=window?.CanFocus==true,WindowState=window==null?"":window.CanFocus?"运行中 · 切回":window.StateLabel};
+            catalog[index]=app with {IsRunning=window?.CanFocus==true,WindowState=window==null?"":window.CanFocus?Text[TextKeys.WindowStateFocused]:window.StateLabel};
         }
         var query=Query.Trim();
         var next=Page is "apps" or "favorites"?catalog.Where(app=>(Page!="favorites"||app.IsFavorite)&&

@@ -5,7 +5,8 @@ public sealed record ShutdownFailure(string Name,Exception Error);
 public sealed record ShutdownResult(bool CanClose,IReadOnlyList<ShutdownFailure> Failures);
 
 /// <summary>Coordinates the UI-thread close attempt while preserving ownership of live app windows.</summary>
-public sealed class ShutdownCoordinator(TimeSpan? timeout=null) {
+public sealed class ShutdownCoordinator(TimeSpan? timeout=null, IShellText? text=null) {
+    private readonly IShellText wording=text??ShellText.Default;
     public bool HasStarted {get;private set;}
     public bool IsStopping {get;private set;}
     private Task<ShutdownResult>? attempt;
@@ -35,7 +36,7 @@ public sealed class ShutdownCoordinator(TimeSpan? timeout=null) {
             foreach(var work in tracked) {
                 if(!work.Completion.IsCompleted) {
                     pending=true;
-                    failures.Add(new(work.Name,new TimeoutException($"收尾任务 {work.Name} 等待超过 {WaitLimit.TotalSeconds:0.#} 秒，仍在后台结束。")));
+                    failures.Add(new(work.Name,new TimeoutException(wording.Format(TextKeys.ShutdownTimeout, work.Name, WaitLimit.TotalSeconds))));
                 } else if(await work.Completion is { } failure)failures.Add(failure);
             }
             result=new(!pending && !hasWindows(),failures);

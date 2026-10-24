@@ -78,13 +78,13 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
             var selected = RestoreSelection(found, previous);
             PublishIfCurrent(ticket, request, new(found, selected, false));
             if (selected?.State != DeviceState.Online && previous != null) {
-                model.ReportDeviceError((selected?.State == DeviceState.Unauthorized
-                    ? "请在手机上允许调试授权后刷新。" : "手机连接未确认，请检查连接后刷新。") + "仍显示上次列表，暂不能启动应用。", preserveCatalog: true);
+                model.ReportDeviceError(model.Text[selected?.State == DeviceState.Unauthorized
+                    ? TextKeys.ScanReauthorize : TextKeys.ScanUnconfirmed] + model.Text[TextKeys.ScanKeepsPrevious], preserveCatalog: true);
             } else await catalog.SelectAsync(selected, request.Token, forceRefresh);
         } catch (OperationCanceledException) {
         } catch (Exception error) when (CatalogErrors.IsExpected(error)) {
             if (IsCurrent(ticket, request)) {
-                var message = "设备读取失败，仍显示上次列表，暂不能启动应用。" + error.Message;
+                var message = model.Text.Format(TextKeys.ScanFailed, error.Message);
                 PublishIfCurrent(ticket, request, new([], null, false, message));
                 model.ReportDeviceError(message, preserveCatalog: true);
             }

@@ -1,3 +1,4 @@
+using System.Reflection;
 using VirCre.Presentation;
 
 var checks = new List<(string Name, Action Check)> {
@@ -388,6 +389,21 @@ using (var marshalCatalog = new CatalogController(marshalSource, marshalModel)) 
     Require(marshalModel.Apps.Single().PackageName == "com.ui.app" && !marshalModel.IsLoading, "CompleteLoad did not marshal to the UI thread");
 }
 Console.WriteLine("PASS: model and catalog publish only through the host dispatcher");
+
+var missingKeys = typeof(TextKeys).GetFields(BindingFlags.Public|BindingFlags.Static)
+    .Where(field => field.IsLiteral).Select(field => (string)field.GetRawConstantValue()!)
+    .Where(key => ShellText.Default[key] == key).ToArray();
+Require(missingKeys.Length == 0, "Default wording is missing keys: " + string.Join(", ", missingKeys));
+var customText = new ShellText(new Dictionary<string,string> {
+    [TextKeys.HintConnect] = "Pick a phone",
+    [TextKeys.CardFavorite] = "Star {0}"
+});
+var textModel = new ShellViewModel(preview: true, text: customText);
+Require(textModel.DeviceHint == "Pick a phone", "Host wording did not reach the device hint");
+Require(textModel.Apps[0].FavoriteLabel == "Star " + textModel.Apps[0].Name, "Card labels did not use the host wording");
+Require(customText[TextKeys.TitleApps] == "全部应用", "A partial catalog must keep untouched defaults");
+Require(customText["unknown.key"] == "unknown.key", "An unknown key must stay visible instead of returning empty text");
+Console.WriteLine("PASS: wording is looked up by key and hosts can override single phrases");
 await ShutdownChecks.RunAsync();
 static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
 static VirCre.Launcher.PhoneDevice DeviceWithApi(int? api) =>

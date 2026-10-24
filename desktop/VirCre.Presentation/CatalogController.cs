@@ -36,7 +36,7 @@ public sealed class CatalogController(IPhoneCatalog phone, ShellViewModel model)
                 model.CompleteLoad(apps);
             }
         } catch (OperationCanceledException) {
-            if (!disposed && ticket == generation) model.FailLoad("应用读取已取消，请刷新重试。");
+            if (!disposed && ticket == generation) model.FailLoad(model.Text[TextKeys.LoadCancelled]);
         } catch (Exception error) when (CatalogErrors.IsExpected(error)) {
             if (!disposed && ticket == generation) model.FailLoad(error.Message);
         } finally {
