@@ -41,7 +41,7 @@ public sealed partial class MainWindow {
             var device=await request.ResolveAsync(devices,(s,t)=>ShortcutRequest.GetHardwareIdAsync(runner,s,t),lifetime.Token);
             if(!await directory.CanLaunchAsync(device.Serial,request.PackageName,lifetime.Token))
                 throw new IOException("手机中已找不到此应用的启动入口，请刷新列表并重新创建快捷方式。");
-            var result=await appWindows.OpenAsync(CreateLaunchRequest(device,request.PackageName,request.Name),lifetime.Token);
+            var result=await AppLaunches.OpenAsync(device,request.PackageName,request.Name,model.VirtualCameraEnabled,model.CameraFrameRate,lifetime.Token);
             RuntimeDiagnostics.Write("shortcut-opened",details:result.Reused?"existing-window":"new-window");
             ShowAction(result.Activated?$"已打开 {request.Name}。":$"{request.Name} 窗口已存在，请从任务栏切回。");
         } catch(OperationCanceledException) { }

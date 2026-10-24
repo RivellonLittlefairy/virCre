@@ -69,6 +69,31 @@ try {
 } finally {closingHost.Processes[0].CloseRelease!.SetResult();await closeInProgress;await closingManager.StopAsync();}
 Console.WriteLine("PASS: window lifecycle checks");
 
+var launchHost=new FakeHost();
+var launchManager=new AppWindowManager(launchHost);
+var launches=new AppLaunchService(launchManager);
+var phoneA=new PhoneDevice("phone.a","A",DeviceState.Online,"hardware-a",35);
+var phoneB=new PhoneDevice("phone.b","B",DeviceState.Online,"hardware-b",36);
+var cardOpen=launches.OpenAsync(phoneA,"com.android.settings","设置",false,15,default);
+launchHost.Processes[0].Ready.SetResult();
+var cardResult=await cardOpen;
+Check(launchHost.StartCount==1 && !cardResult.Window.IsVirtualCamera,"a new window uses the default launch mode");
+var reopen=launches.OpenAsync(phoneA,"com.android.settings","设置",true,15,default);
+var reopenResult=await reopen;
+Check(reopenResult.Reused && launchHost.StartCount==1 && !reopenResult.Window.IsVirtualCamera,"changing the default must not relaunch or convert an existing window");
+var otherPhoneOpen=launches.OpenAsync(phoneB,"com.android.settings","设置",true,15,default);
+launchHost.Processes[1].Ready.SetResult();
+var otherPhoneResult=await otherPhoneOpen;
+Check(launchHost.StartCount==2 && otherPhoneResult.Window.Id!=cardResult.Window.Id && otherPhoneResult.Window.IsVirtualCamera,
+    "the same package on another phone gets its own window with its own mode");
+var oldPhone=new PhoneDevice("phone.old","Old",DeviceState.Online,"hardware-old",28);
+var oldPhoneRejected=false;
+try {await launches.OpenAsync(oldPhone,"com.android.settings","设置",false,15,default);}
+catch(IOException) {oldPhoneRejected=true;}
+Check(oldPhoneRejected && launchHost.StartCount==2,"an unsupported Android version is rejected before starting a process");
+await launchManager.StopAsync();
+Console.WriteLine("PASS: app launch service resolves mode once for every entry point");
+
 if((args.Length==2 || args.Length==4 && args[2]=="--runtime-root") && args[0]=="--device") {
     var tools=new BundledTools(args.Length==4?args[3]:Path.GetFullPath("out/desktop-release"));
     var serial=args[1];var commands=new CommandRunner(tools);var directory=new PhoneCatalog(commands);

@@ -20,11 +20,8 @@ public sealed partial class MainWindow {
     private async void OpenApp_Click(object sender, RoutedEventArgs args) {
         if ((sender as Button)?.Tag is AppCard card) await OpenCardAsync(card);
     }
-    private AppLaunchRequest CreateLaunchRequest(PhoneDevice device,string packageName,string name) {
-        // A changed default affects new windows; clicking an existing app still focuses its current mode.
-        return appWindows.Windows.FirstOrDefault(value=>value.Request.IsForDevice(device) && value.PackageName==packageName)?.Request
-            ?? AndroidCompatibility.CreateLaunchRequest(device,packageName,name,model.VirtualCameraEnabled,model.CameraFrameRate);
-    }
+    private AppLaunchService? appLaunches;
+    private AppLaunchService AppLaunches => appLaunches??=new(appWindows);
     private bool CanActOnCard(AppCard card,PhoneDevice? device) =>
         AppActionGuard.CanActOn(card,device,model,scanning,closing || windowShutdown.HasStarted);
     private async Task OpenCardAsync(AppCard card) {
@@ -35,7 +32,7 @@ public sealed partial class MainWindow {
         }
         ShowAction($"正在打开 {card.Name}…");
         try {
-            var result = await appWindows.OpenAsync(CreateLaunchRequest(device, card.PackageName, card.Name), lifetime.Token);
+            var result = await AppLaunches.OpenAsync(device,card.PackageName,card.Name,model.VirtualCameraEnabled,model.CameraFrameRate,lifetime.Token);
             ShowAction(result.Window.IsVirtualCamera ? $"{card.Name} 已以虚拟摄像头模式打开。采集窗口盖住的桌面；设置中可调整帧率或关闭默认相机。" :
                 result.Activated ? result.Reused ? $"已切回 {card.Name}。" : $"{card.Name} 的独立窗口已打开。" : $"{card.Name} 窗口已存在，请从任务栏切回。");
         } catch (OperationCanceledException) { if (!closing) ShowAction("应用启动已取消。"); }
