@@ -12,7 +12,8 @@ public sealed partial class MainWindow {
     // Explorer consumes these files. Keep them outside legacy portable folders that may inherit Low integrity.
     internal static readonly string ShortcutDataDirectory=Path.Combine(PreferredDataDirectory,"shell");
     private readonly SettingsStore settingsStore=new(Path.Combine(DataDirectory,"settings.json"));
-    private Task settingsTask=Task.CompletedTask;
+    private SettingsSaveQueue? saveQueue;
+    private SettingsSaveQueue SaveQueue => saveQueue??=new(settingsStore.Save);
     private bool syncingCameraSettings;
     private void VirtualCamera_Toggled(object sender,RoutedEventArgs args) {
         if(!ready || syncingCameraSettings || windowShutdown.HasStarted)return;
@@ -48,11 +49,10 @@ public sealed partial class MainWindow {
     private void SaveSettings() {
         if(windowShutdown.HasStarted)return;
         var snapshot=model.ExportSettings();
-        settingsTask=SaveAfterAsync(settingsTask,snapshot);
+        _=ObserveSaveAsync(SaveQueue.EnqueueAsync(snapshot));
     }
-    private async Task SaveAfterAsync(Task previous, UserSettings settings) {
-        await previous;
-        try {await Task.Run(()=>settingsStore.Save(settings));}
+    private async Task ObserveSaveAsync(Task save) {
+        try {await save;}
         catch(Exception error) when(error is IOException or UnauthorizedAccessException) {ShowAction("设置保存失败，本次更改暂留内存："+error.Message,true);}
     }
 }

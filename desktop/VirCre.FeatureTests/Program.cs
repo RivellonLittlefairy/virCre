@@ -94,6 +94,37 @@ try {
     var firstPhone=(await isolated.GetAppsAsync("phone.one",default)).Single().IconPath!;
     var secondPhone=(await isolated.GetAppsAsync("phone.two",default)).Single().IconPath!;
     Check(firstPhone!=secondPhone && File.Exists(firstPhone) && File.Exists(secondPhone),"same package on different phones has isolated icon cache");
+    var saveOrder=new List<int>();
+    var settingsQueue=new SettingsSaveQueue(settings=>{
+        lock(saveOrder)saveOrder.Add(settings.CameraFrameRate);
+        if(settings.CameraFrameRate==1)Thread.Sleep(50);
+    });
+    var firstSave=settingsQueue.EnqueueAsync(new([],CameraFrameRate:1));
+    var secondSave=settingsQueue.EnqueueAsync(new([],CameraFrameRate:2));
+    await Task.WhenAll(firstSave,secondSave);
+    Check(saveOrder.SequenceEqual([1,2]),"settings writes keep the order they were accepted in");
+    var failureWrites=new List<int>();
+    var failingQueue=new SettingsSaveQueue(settings=>{
+        if(settings.CameraFrameRate==3)throw new IOException("disk full");
+        failureWrites.Add(settings.CameraFrameRate);
+    });
+    var failingSave=failingQueue.EnqueueAsync(new([],CameraFrameRate:3));
+    var followingSave=failingQueue.EnqueueAsync(new([],CameraFrameRate:4));
+    var saveFailureSeen=false;
+    try {await failingSave;} catch(IOException) {saveFailureSeen=true;}
+    await followingSave;
+    Check(saveFailureSeen && failureWrites.SequenceEqual([4]),"one failed write is reported without blocking the next snapshot");
+    var stoppingWriter=new SettingsSaveQueue(_=>Thread.Sleep(50));
+    var stoppingWrite=stoppingWriter.EnqueueAsync(new([]));
+    var stopping=stoppingWriter.StopAsync();
+    Check(!stopping.IsCompleted,"stop waits for accepted settings writes");
+    await stopping;await stoppingWrite;
+    var rejectedAfterStop=false;
+    try {await stoppingWriter.EnqueueAsync(new([]));}catch(InvalidOperationException) {rejectedAfterStop=true;}
+    await stoppingWriter.StopAsync();
+    Check(rejectedAfterStop,"a stopped queue rejects new snapshots and its second stop is harmless");
+    Console.WriteLine("PASS: settings save queue serializes, isolates failures and drains on shutdown");
+
     if (args.Length is 3 or 5 && args[0] == "--device") {
         var liveCache=args.Length==5 && args[3]=="--cache-root"?Path.GetFullPath(args[4]):Path.Combine(root,"icons");
         var liveTools=new BundledTools(Path.GetFullPath("out/desktop-release"));

@@ -82,7 +82,7 @@ public sealed partial class MainWindow : Window {
             var result=await windowShutdown.TryStopAsync([
                 new("lifetime",()=>{lifetime.Cancel();return Task.CompletedTask;}),
                 new("catalog",catalogController.StopAsync),new("refresh",()=>refreshTask),
-                new("settings",()=>settingsTask),new("shortcut-activation",()=>shortcutTask),
+                new("settings",()=>SaveQueue.StopAsync()),new("shortcut-activation",()=>shortcutTask),
                 new("native-drag",()=>nativeDragTask),new("shortcut-writes",()=>Task.WhenAll(shortcutWrites.ToArray()))],
                 appWindows.StopAsync,()=>appWindows.Windows.Count>0,
                 enabled=>{Root.IsHitTestVisible=enabled;Navigation.IsEnabled=enabled;});
