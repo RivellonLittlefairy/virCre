@@ -35,8 +35,11 @@ public sealed partial class MainWindow {
         if (!ready || syncingDevices || closing || windowShutdown.HasStarted) return;
         await devices.SelectAsync(DevicePicker.SelectedItem as PhoneDevice, lifetime.Token);
     }
-    private Task RefreshDevicesAsync(bool forceRefresh = false) =>
-        windowShutdown.HasStarted ? Task.CompletedTask : devices.RefreshAsync(forceRefresh, lifetime.Token);
+    private Task RefreshDevicesAsync(bool forceRefresh = false) {
+        if(windowShutdown.HasStarted)return Task.CompletedTask;
+        manualDeviceRefreshTask=devices.RefreshAsync(forceRefresh,lifetime.Token);
+        return manualDeviceRefreshTask;
+    }
     internal bool TryRecoverCatalogFormatError(Exception error) {
         if(!ready || closing || windowShutdown.HasStarted || !devices.TryRecoverFormatError(error))return false;
         ShowAction("设备数据格式异常，请刷新设备后重试。",true);

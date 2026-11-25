@@ -273,7 +273,13 @@ public class NewDisplayCapture extends SurfaceCapture {
             });
         } catch (Exception e) {
             Ln.e("Could not create display", e);
-            throw new AssertionError("Could not create display");
+            Throwable cause = e;
+            for (int depth = 0; depth < 8 && cause.getCause() != null && cause.getCause() != cause; ++depth) {
+                cause = cause.getCause();
+            }
+            // Keep the actual framework failure in both the crash stack and the
+            // desktop's one-line startup error instead of discarding its cause.
+            throw new AssertionError("Could not create display: " + cause, e);
         }
     }
 

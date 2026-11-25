@@ -252,6 +252,48 @@ using (var scanDevices = new DeviceController(scanSource, scanCatalog, scanModel
 }
 Console.WriteLine("PASS: device scans publish only the newest result and restore selection by hardware identity");
 
+var connectionSource = new ScriptedPhoneCatalog();
+var connectionModel = new ShellViewModel();
+using (var connectionCatalog = new CatalogController(connectionSource, connectionModel))
+using (var connectionDevices = new DeviceController(connectionSource, connectionCatalog, connectionModel)) {
+    var preferred = Device("p.preferred", "Preferred", "hw-preferred");
+    var other = Device("p.other", "Other", "hw-other");
+    var initial = connectionDevices.RefreshAsync(false, CancellationToken.None);
+    connectionSource.Scans[0].SetResult([preferred]);
+    await Until(() => connectionSource.HasAppRequest(preferred.Serial));
+    connectionSource.LastApps(preferred.Serial).SetResult([new("Keep app", "com.keep.app", false)]);
+    await initial;
+    connectionModel.Search("Keep");
+
+    var added = connectionDevices.RefreshConnectionsAsync(CancellationToken.None);
+    connectionSource.Scans[1].SetResult([preferred, other]);
+    await added;
+    Require(connectionDevices.State.Selected?.HardwareId == "hw-preferred" && connectionModel.Query == "Keep" && connectionSource.AppRequests(preferred.Serial) == 1,
+        "Connecting another phone must preserve the current phone, search and app load");
+
+    var removed = connectionDevices.RefreshConnectionsAsync(CancellationToken.None);
+    connectionSource.Scans[2].SetResult([other]);
+    await removed;
+    Require(connectionDevices.State.Selected == null && !connectionModel.HasDevice && connectionModel.Apps.Count == 1 && !connectionSource.HasAppRequest(other.Serial),
+        "Losing the selected phone must retain its list without switching to another phone");
+
+    var reconnected = connectionDevices.RefreshConnectionsAsync(CancellationToken.None);
+    var wireless = preferred with {Serial="p.preferred.wifi"};
+    connectionSource.Scans[3].SetResult([other, wireless]);
+    await Until(() => connectionSource.HasAppRequest(wireless.Serial));
+    connectionSource.LastApps(wireless.Serial).SetResult([new("Keep app", "com.keep.app", false)]);
+    await reconnected;
+    Require(connectionDevices.State.Selected?.Serial == wireless.Serial && connectionModel.HasDevice && connectionModel.Apps.Single().SourceSerial == wireless.Serial,
+        "The selected phone must be restored by hardware identity after reconnecting over another transport");
+
+    var replaced = connectionDevices.RefreshConnectionsAsync(CancellationToken.None);
+    connectionSource.Scans[4].SetResult([wireless with {HardwareId="hw-replacement"}]);
+    await replaced;
+    Require(connectionDevices.State.Selected == null && !connectionModel.HasDevice,
+        "A different phone reusing the old transport address must never inherit selection");
+}
+Console.WriteLine("PASS: connection changes preserve app lists and restore only the selected phone");
+
 var switchSource = new ScriptedPhoneCatalog();
 var switchModel = new ShellViewModel();
 using (var switchCatalog = new CatalogController(switchSource, switchModel))

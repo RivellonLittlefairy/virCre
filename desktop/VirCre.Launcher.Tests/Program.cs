@@ -19,6 +19,8 @@ if(args is ["--runtime-probe",var applicationRoot]) {
     } finally {Environment.SetEnvironmentVariable("PATH",oldPath);Environment.SetEnvironmentVariable("ADB",oldAdb);Environment.SetEnvironmentVariable("SCRCPY_SERVER_PATH",oldServer);}
 }
 
+CompanionAssociationChecks.Run();
+await DeviceMonitorChecks.RunAsync();
 var devices = PhoneCatalog.ParseDevices("List of devices attached\nphone.one device product:p model:V2458A device:p\nphone.two unauthorized\nphone.three offline\n");
 Check(devices.Count == 3 && devices[0].Model == "V2458A" && devices[1].State == DeviceState.Unauthorized && devices[2].State == DeviceState.Offline, "device authorization states");
 var listing = "[server] INFO: List of apps:\n * 设置 com.android.settings\n - A label-with spaces 应用 com.example.test\n - A label-with spaces 应用 com.example.test\n";

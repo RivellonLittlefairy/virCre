@@ -36,3 +36,6 @@ virCre-data/
 # Private code-signing material
 *.pfx
 *.p12
+
+# Local Android test projects
+/test-projects/

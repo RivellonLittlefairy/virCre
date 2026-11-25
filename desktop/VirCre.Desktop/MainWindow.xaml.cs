@@ -87,6 +87,7 @@ public sealed partial class MainWindow : Window {
         try {
             var result=await windowShutdown.TryStopAsync([
                 new("lifetime",()=>{lifetime.Cancel();return Task.CompletedTask;}),
+                new("device-monitor",()=>Task.WhenAll(deviceMonitorTask,automaticDeviceRefreshTask)),
                 new("devices",devices.StopAsync),
                 new("settings",()=>SaveQueue.StopAsync()),new("shortcut-activation",()=>shortcutTask),
                 new("native-drag",()=>nativeDragTask),new("shortcut-writes",()=>Task.WhenAll(shortcutWrites.ToArray()))],
@@ -133,6 +134,7 @@ public sealed partial class MainWindow : Window {
             AppWindow.Move(new PointInt32(area.X + Math.Max(0, (area.Width - AppWindow.Size.Width) / 2),
                 area.Y + Math.Max(0, (area.Height - AppWindow.Size.Height) / 2)));
         }
+        StartDeviceMonitor();
         await RefreshDevicesAsync();
     }
     private void XamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateMinimumSize();

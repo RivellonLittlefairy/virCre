@@ -127,7 +127,14 @@ final class VirtualDeviceAdapter implements AutoCloseable {
         if (display == null) throw new IllegalStateException("Virtual display returned null");
         AgentLog.event("display-created", "displayId", displayId());
         if (applicationMode) {
-            Object windowManager = Class.forName("android.view.WindowManagerGlobal").getMethod("getWindowManagerService").invoke(null);
+            // WindowManagerGlobal on Android 17 reads ApplicationSharedMemory,
+            // which app_process does not initialize like a bound application.
+            // Use the same window-service Binder boundary as scrcpy's wrapper.
+            IBinder windowBinder = (IBinder) Class.forName("android.os.ServiceManager")
+                    .getMethod("getService", String.class).invoke(null, "window");
+            if (windowBinder == null) throw new IllegalStateException("window service missing");
+            Object windowManager = Class.forName("android.view.IWindowManager$Stub")
+                    .getMethod("asInterface", IBinder.class).invoke(null, windowBinder);
             invoke(windowManager, "setDisplayImePolicy", new Class<?>[]{int.class, int.class}, displayId(), 0);
         }
 
@@ -169,6 +176,13 @@ final class VirtualDeviceAdapter implements AutoCloseable {
     }
 
     private void onCallback(String name, Object[] args) {
+        // Android 17 also sends onOpenCamera() and onConfigureSession(config,
+        // consumer). Their interface defaults are no-ops; a dynamic proxy must
+        // preserve that behavior instead of interpreting their arguments as a stream ID.
+        // Both capture-request overloads retain streamId as their first parameter.
+        if (!name.equals("onStreamConfigured") && !name.equals("onProcessCaptureRequest") && !name.equals("onStreamClosed")) {
+            return;
+        }
         int streamId = (Integer) args[0];
         if (name.equals("onStreamConfigured")) {
             EglPattern old = streams.remove(streamId);

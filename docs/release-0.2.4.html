@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>virCre 0.2.4 更新说明</title>
+<style>body{font:16px/1.85 system-ui,'Microsoft YaHei',sans-serif;max-width:960px;margin:36px auto;padding:0 24px;color:#263449}a{color:#2765e8}li{margin:10px 0}</style></head><body>
+<h1>virCre 0.2.4</h1><p>2026-11-25 · Windows x64</p><h2>更新内容</h2><ul><li>修复 Android 17 下虚拟摄像头的设备关联识别和初始化问题，保留 Android 16 的处理方式。</li>
+<li>修复 Android 17 打开相机时因新增回调触发异常、导致投屏服务退出的问题。</li>
+<li>新增设备连接状态自动感知，手机接入、断开或调试授权状态变化时自动更新设备列表，应用列表继续优先使用本地缓存。</li>
+<li>当前手机断开后保留应用列表并禁用启动操作；原手机重新连接后按硬件标识恢复选择，不自动切换到其他手机。</li>
+<li>保留虚拟摄像头初始化的底层异常，设备关联命令失败时显示具体原因，方便后续排查。</li></ul>
+<h2>下载与升级</h2><p>安装版：virCre-0.2.4-win-x64-setup.exe；便携版：virCre-0.2.4-win-x64-portable.zip；校验文件：virCre-0.2.4-SHA256SUMS.txt。</p>
+<p>升级前关闭 virCre 及其手机应用窗口。便携版需完整解压并保留整个目录；移动程序目录后需重新创建手机应用快捷方式。</p>
+<p>发布流程执行构建和文件校验，不自动运行安装器或操作手机。安装包未进行代码签名。兼容要求与使用方法见 <a href="https://github.com/RivellonLittlefairy/virCre/blob/v0.2.4/README.md">README</a>。</p></body></html>

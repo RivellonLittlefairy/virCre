@@ -12,6 +12,7 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
     private CancellationTokenSource? scan;
     private int generation;
     private bool disposed;
+    private PhoneDevice? preferredDevice;
     private DeviceSelectionState state = new([], null, false);
 
     public DeviceSelectionState State => state;
@@ -26,11 +27,21 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
         return work;
     }
 
+    /// <summary>Updates transport state without rereading apps when the selected online phone is unchanged.</summary>
+    public Task RefreshConnectionsAsync(CancellationToken token) {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var work=RefreshCoreAsync(false,token,connectionsOnly:true);
+        pending.RemoveAll(task=>task.IsCompleted);
+        pending.Add(work);
+        return work;
+    }
+
     /// <summary>Selects a device from the last snapshot; cancels any scan still in flight.</summary>
     public Task SelectAsync(PhoneDevice? device, CancellationToken token) {
         ObjectDisposedException.ThrowIf(disposed, this);
         ++generation;
         scan?.Cancel();
+        preferredDevice=device;
         Publish(new(state.Devices, device, false));
         var work = catalog.SelectAsync(device, token);
         pending.RemoveAll(task => task.IsCompleted);
@@ -65,20 +76,25 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
         return true;
     }
 
-    private async Task RefreshCoreAsync(bool forceRefresh, CancellationToken token) {
+    private async Task RefreshCoreAsync(bool forceRefresh, CancellationToken token, bool connectionsOnly = false) {
         if (disposed) return;
         var ticket = ++generation;
         scan?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(token);
         scan = request;
-        var previous = state.Selected;
+        var previous = state.Selected ?? preferredDevice;
         Publish(state with { Scanning = true, Error = null });
-        catalog.CancelActive();
+        if(!connectionsOnly)catalog.CancelActive();
         try {
             var found = await phone.GetDevicesAsync(request.Token);
             if (!IsCurrent(ticket, request)) return;
-            var selected = RestoreSelection(found, previous);
+            var selected = RestoreSelection(found, previous, selectLone:!connectionsOnly || previous==null);
             PublishIfCurrent(ticket, request, new(found, selected, false));
+            if(selected!=null)preferredDevice=selected;
+            if(connectionsOnly && previous is {State:DeviceState.Online} && selected is {State:DeviceState.Online} &&
+                selected.Serial==previous.Serial && selected.HardwareId==previous.HardwareId && selected.ApiLevel==previous.ApiLevel &&
+                model.HasDevice && model.CurrentSerial==selected.Serial)return;
+            if(connectionsOnly)catalog.CancelActive();
             if (selected?.State != DeviceState.Online && previous != null) {
                 model.ReportDeviceError(model.Text[selected?.State == DeviceState.Unauthorized
                     ? TextKeys.ScanReauthorize : TextKeys.ScanUnconfirmed] + model.Text[TextKeys.ScanKeepsPrevious], preserveCatalog: true);
@@ -97,11 +113,12 @@ public sealed class DeviceController(IPhoneCatalog phone, CatalogController cata
     }
 
     /// <summary>Hardware identity first, then any transport of the same phone, then a lone device.</summary>
-    private static PhoneDevice? RestoreSelection(IReadOnlyList<PhoneDevice> devices, PhoneDevice? previous) {
+    private static PhoneDevice? RestoreSelection(IReadOnlyList<PhoneDevice> devices, PhoneDevice? previous, bool selectLone = true) {
         PhoneDevice? selected = previous is {HardwareId.Length:>0}
             ? devices.FirstOrDefault(device => device.HardwareId == previous.HardwareId) : null;
-        selected ??= devices.FirstOrDefault(device => previous != null && device.HasConnection(previous.Serial));
-        return selected ?? (devices.Count == 1 ? devices[0] : null);
+        selected ??= devices.FirstOrDefault(device => previous != null && device.HasConnection(previous.Serial) &&
+            (previous.HardwareId.Length==0 || device.HardwareId==previous.HardwareId));
+        return selected ?? (selectLone && devices.Count == 1 ? devices[0] : null);
     }
 
     private bool IsCurrent(int ticket, CancellationTokenSource request) =>

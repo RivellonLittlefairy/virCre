@@ -51,7 +51,19 @@ public final class ApplicationCameraSession implements AutoCloseable {
     public synchronized void attachEncoder(Surface surface, int width, int height, int dpi) throws Exception {
         if (closed.get()) throw new IllegalStateException("Virtual camera session already closed");
         if (!initialized) {
-            adapter.create(association, 0, sessionId, true, true, width, height, dpi);
+            AgentLog.event("initialization-started", "width", width, "height", height, "dpi", dpi);
+            try {
+                adapter.create(association, 0, sessionId, true, true, width, height, dpi);
+            } catch (Exception failure) {
+                Throwable cause = failure;
+                for (int depth = 0; depth < 8 && cause.getCause() != null && cause.getCause() != cause; ++depth) {
+                    cause = cause.getCause();
+                }
+                // Framework initialization errors only; never input text or frame data.
+                try { AgentLog.event("initialization-failed", "error", cause.toString()); }
+                catch (RuntimeException loggingFailure) { failure.addSuppressed(loggingFailure); }
+                throw failure;
+            }
             initialized = true;
         }
         adapter.attachApplicationEncoder(surface, width, height, dpi);

@@ -31,12 +31,12 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
         var before=await AdbAsync(["shell","cmd","companiondevice","list","0"],token).ConfigureAwait(false);
         if(before.Contains(mac,StringComparison.OrdinalIgnoreCase))throw new IOException("临时关联地址冲突，请重新打开。");
         associationAttempted=true;
-        await AdbAsync(["shell","cmd","companiondevice","associate","0","com.android.shell",mac,"android.app.role.COMPANION_DEVICE_APP_STREAMING","true"],token).ConfigureAwait(false);
+        await AdbAsync(CompanionAssociationProtocol.Create(mac),token).ConfigureAwait(false);
         int association=0;
         for(int i=0;i<12;i++) {
             var list=await AdbAsync(["shell","cmd","companiondevice","list","0"],token).ConfigureAwait(false);
-            var match=Regex.Match(list,@"(?im)^\s*(\d+)\s*\|\s*com\.android\.shell\s*\|\s*"+Regex.Escape(mac)+@"\s*$");
-            if(match.Success && int.TryParse(match.Groups[1].Value,out association))break;
+            association=CompanionAssociationProtocol.FindId(list,mac);
+            if(association>0)break;
             await Task.Delay(250,token).ConfigureAwait(false);
         }
         if(association<=0)throw new IOException("手机未创建可核对的虚拟设备关联。");
@@ -140,7 +140,16 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
     }
     private async Task<string> AdbAsync(IReadOnlyList<string> args,CancellationToken token) {
         var result=await runner.RunAsync("adb",new[]{"-s",request.Serial}.Concat(args).ToArray(),TimeSpan.FromSeconds(12),token).ConfigureAwait(false);
-        if(result.ExitCode!=0)throw new IOException("手机连接命令失败（"+args[0]+"），请检查 ADB 连接。");
+        if(result.ExitCode!=0) {
+            if(args.Count>=4 && args[0]=="shell" && args[1]=="cmd" && args[2]=="companiondevice") {
+                // Only CDM diagnostics are included here, never application output or frame data.
+                var detail=string.IsNullOrWhiteSpace(result.Error)?result.Output:result.Error;
+                detail=string.Join(" ",detail.Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries).Take(3)).Trim();
+                if(detail.Length>320)detail=detail[..320];
+                throw new IOException($"手机设备关联命令失败（{args[3]}，退出码 {result.ExitCode}）"+(detail.Length>0?"："+detail:"。"));
+            }
+            throw new IOException("手机连接命令失败（"+args[0]+"），请检查 ADB 连接。");
+        }
         return result.Output;
     }
     internal async Task CleanupAsync() {
@@ -176,8 +185,8 @@ internal sealed class CameraDeviceSession(AppLaunchRequest request,BundledTools 
         }).ConfigureAwait(false);
         if(associationAttempted)await Attempt("临时设备关联",async ()=>{
             var list=await AdbAsync(["shell","cmd","companiondevice","list","0"],CancellationToken.None).ConfigureAwait(false);
-            if(list.Contains(mac,StringComparison.OrdinalIgnoreCase))
-                await AdbAsync(["shell","cmd","companiondevice","disassociate","0","com.android.shell",mac],CancellationToken.None).ConfigureAwait(false);
+            if(CompanionAssociationProtocol.FindId(list,mac)>0)
+                await AdbAsync(CompanionAssociationProtocol.Remove(mac),CancellationToken.None).ConfigureAwait(false);
             list=await AdbAsync(["shell","cmd","companiondevice","list","0"],CancellationToken.None).ConfigureAwait(false);
             if(list.Contains(mac,StringComparison.OrdinalIgnoreCase))throw new IOException();
             associationAttempted=false;

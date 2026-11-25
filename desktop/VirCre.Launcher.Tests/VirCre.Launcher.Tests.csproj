@@ -1,1 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../VirCre.Launcher/VirCre.Launcher.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../VirCre.Launcher/VirCre.Launcher.csproj" /><Compile Include="../VirCre.Camera/CompanionAssociationProtocol.cs" Link="CompanionAssociationProtocol.cs" /></ItemGroup></Project>
